@@ -12,22 +12,18 @@ function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
-/**
- * Existing files are served before the Worker runs, so a file-like path that gets here is missing
- * (for example an old hashed chunk after a deploy). It must be a 404: the SPA fallback would answer
- * 200 with index.html, which a service worker could cache in place of JavaScript.
- */
-function isMissingFile(request: Request, pathname: string): boolean {
-  return request.headers.get("Sec-Fetch-Mode") !== "navigate" && /\.[a-z0-9]+$/i.test(pathname);
-}
+const notFound = () =>
+  new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url);
     if (isApiPath(pathname)) return app.fetch(request, env, ctx);
-    if (isMissingFile(request, pathname)) {
-      return new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
-    }
-    return env.ASSETS.fetch(request);
+    const res = await env.ASSETS.fetch(request);
+    // wrangler.jsonc routes /assets/* here too. A missing hashed file (an old chunk after a deploy) gets the
+    // SPA fallback from the assets service, i.e. 200 index.html, which a service worker could cache as
+    // JavaScript. Answer 404 instead.
+    if (pathname.startsWith("/assets/") && (res.headers.get("Content-Type") ?? "").startsWith("text/html")) return notFound();
+    return res;
   },
 } satisfies ExportedHandler<Env>;
