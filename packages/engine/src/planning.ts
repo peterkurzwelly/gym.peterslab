@@ -11,7 +11,7 @@ import { fractionalSets, roundLoad, weightFromE1rm } from "./calc";
 import { initId, makeDecision, planId } from "./decisions";
 import { phaseForWeek, setsRuleFor } from "./phases";
 import { initialTarget, readinessScope, statsOut } from "./progression";
-import { planModifiers, readinessBanner, readinessFor, spacing } from "./events";
+import { planModifiers, readinessBanner, readinessFor, shortBreakApplies, spacing } from "./events";
 import { buildCardio } from "./cardio";
 import { comebackText, fmtNum, fmtPct, numberWord, plural } from "./text";
 
@@ -184,6 +184,8 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
   const day = n.dayByCode.get(code);
   const mods = planModifiers(an);
   const comeback = mods.comeback || mode === "comeback";
+  // A comeback started by hand (mode comeback) overrides the short break the same way a detected one does.
+  const breakResume = shortBreakApplies(n, mods.rawShortBreak, comeback, mods.longBreak);
   const short = mode === "short";
   const lims = activeLimitations(n);
   const cfg = n.config;
@@ -234,7 +236,7 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
     if (comeback) work = reduceSets(work, cfg.comeback.set_reduction, cfg.comeback.min_sets);
 
     let override: string | null = deload ? "phase.deload" : null;
-    if (weight != null && weight > 0 && (mods.longBreak || mods.breakResume)) {
+    if (weight != null && weight > 0 && (mods.longBreak || breakResume)) {
       const pct = mods.longBreak ? cfg.break.long_load_pct : cfg.break.short_load_pct;
       weight = roundLoad(weight * pct, inc, "down");
       override ??= mods.longBreak ? "event.break_long" : "event.break_short";
@@ -310,7 +312,7 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
   }
   if (comeback) {
     const red = cfg.comeback.set_reduction;
-    adjust("event.comeback", comebackText(red, mods.longBreak || mods.breakResume), { detected: mods.comeback, mode });
+    adjust("event.comeback", comebackText(red, mods.longBreak || breakResume), { detected: mods.comeback, mode });
     flags.push("comeback");
   }
   if (mods.longBreak) {
@@ -320,7 +322,7 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
       : `Back after ${mods.gapDays} days: weights at ${fmtPct(b.long_load_pct)}% today.`;
     adjust("event.break_long", text, { gap_days: mods.gapDays }, { load_pct: b.long_load_pct });
     flags.push("long_break_restart");
-  } else if (mods.breakResume) {
+  } else if (breakResume) {
     const b = cfg.break;
     const text =
       mods.gapDays != null && mods.gapDays >= b.short_days_min
@@ -367,11 +369,12 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
       exercise_id: d.ex.id,
       name: d.ex.name,
       primary_exercise_id: d.p.exercise_id,
+      primary_name: n.exercises[d.p.exercise_id]?.name ?? d.p.exercise_id,
       swapped: d.swapped,
       starred: d.p.starred,
       main_lift: d.main,
       measure: d.slot.measure,
-      per_side: d.p.per_side,
+      per_side: d.slot.per_side,
       per_hand: d.ex.per_hand,
       bodyweight: isBodyweight(d.ex),
       progression_rule: d.slot.progression_rule,

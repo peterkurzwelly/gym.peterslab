@@ -7,6 +7,7 @@ import type { EngineConfig } from "@gym/schema";
 import { computeState, planCardio, planSession, summarizeSession } from "../../src/index";
 import type { EngineState } from "../../src/index";
 import {
+  addDays,
   at,
   checkin,
   day,
@@ -325,8 +326,30 @@ describe("SPEC 6.4 · zero week", () => {
     expect(after.next.plan.flags).not.toContain("comeback"); // only the first session back
   });
 
-  it("6.4 zero week + short break (default config) · both apply: one set fewer and loads × 0.85 rounded down", () => {
+  it("6.4 zero week + short break (default config) · the comeback overrides the short break: one set fewer, same loads", () => {
+    // Rule change (ENGINE_RULES 4.5, comeback.overrides_short_break = true): the 9 day gap still meets the short
+    // break rule, but a comeback keeps the same weights (PROGRAM.md rule 4) and starts no 85% window.
+    // Before this change both applied (loads × 0.85); that case lives on below with the override switched off.
     const ctx = makeCtx({ now, history: history() });
+    const state = computeState(ctx);
+    const plan = planSession(ctx, { code: "A", mode: "full" });
+    expect(plan.flags).toContain("comeback");
+    expect(plan.flags).not.toContain("break_resume");
+    expect(plan.exercises.map((e) => workSets(e).length)).toEqual([2, 2, 2, 1, 1, 1]);
+    for (const pid of ["A1", "A2", "A3"]) {
+      const pe = planned(plan, pid);
+      const base = must(state.tracks[keyOf(pe)]?.base_weight, `${pid} base`);
+      expect(workSets(pe).every((x) => x.weight === base), pid).toBe(true);
+    }
+    expect(nudge(state, "break_resume")).toBeUndefined();
+    expect(state.next.plan.adjustments.map((a) => a.rule_id)).not.toContain("event.break_short");
+  });
+
+  it("6.4 zero week + short break · with comeback.overrides_short_break false both apply: one set fewer and loads × 0.85 rounded down", () => {
+    const both = (c: EngineConfig) => {
+      c.comeback.overrides_short_break = false;
+    };
+    const ctx = makeCtx({ now, history: history(), config: both });
     const state = computeState(ctx);
     const plan = planSession(ctx, { code: "A", mode: "full" });
     expect(plan.flags).toEqual(expect.arrayContaining(["comeback", "break_resume"]));
@@ -344,25 +367,92 @@ describe("SPEC 6.4 · zero week", () => {
     expect(must(nudge(isolatedState, "comeback")).text).toBe(sameText);
     expect(isolatedState.next.plan.adjustments.map((a) => a.text)).toContain(sameText);
 
-    // Default config: the zero week also made a short break, loads drop to 85%, so the copy must not say "same weights".
+    // Default config: the zero week also meets the short break rule, but the comeback overrides it (ENGINE_RULES 4.5,
+    // rule change), so the weights really are the same and the copy says so.
     const state = computeState(makeCtx({ now, history: history() }));
-    const lines = [must(nudge(state, "comeback")).text, ...state.next.plan.adjustments.map((a) => a.text)];
+    expect(must(nudge(state, "comeback")).text).toBe(sameText);
+    expect(state.next.plan.adjustments.map((a) => a.text)).toContain(sameText);
+    expect(planned(state.next.plan, "A1").rule_id.startsWith("event.break")).toBe(false);
+
+    // With the override off, loads drop to 85%, so the copy must not say "same weights".
+    const both = computeState(
+      makeCtx({
+        now,
+        history: history(),
+        config: (c) => {
+          c.comeback.overrides_short_break = false;
+        },
+      }),
+    );
+    const lines = [must(nudge(both, "comeback")).text, ...both.next.plan.adjustments.map((a) => a.text)];
     for (const line of lines) expect(line).not.toMatch(/same weights/);
-    expect(must(state.next.plan.adjustments.find((a) => a.rule_id === "event.comeback")).text).toMatch(/one set less/);
-    expect(must(state.next.plan.adjustments.find((a) => a.rule_id === "event.break_short")).text).toMatch(/85%/);
+    expect(must(both.next.plan.adjustments.find((a) => a.rule_id === "event.comeback")).text).toMatch(/one set less/);
+    expect(must(both.next.plan.adjustments.find((a) => a.rule_id === "event.break_short")).text).toMatch(/85%/);
     // Loaded exercises explain the lower load with the break decision.
-    expect(planned(state.next.plan, "A1").rule_id).toBe("event.break_short");
+    expect(planned(both.next.plan, "A1").rule_id).toBe("event.break_short");
   });
 
-  it("6.4 zero week · ENGINE_RULES 4.5: a qualifying cardio session first ends the comeback (the break window still applies)", () => {
-    const ctx = makeCtx({ now: at(day(4, "tue"), "07:00"), history: [history(), intervals(day(4, "mon"), 3)] });
+  it("6.4 zero week · ENGINE_RULES 4.5: a cardio session between the zero week and the first strength session keeps the comeback", () => {
+    // Rule change: only a strength or travel session ends a pending comeback. Before, the Monday intervals ended it and
+    // Tuesday's A was planned at 85% (break window) with full sets.
+    const cardioMon = intervals(day(4, "mon"), 3);
+    const ctx = makeCtx({ now: at(day(4, "tue"), "07:00"), history: [history(), cardioMon] });
     const state = computeState(ctx);
     expect(state.weeks[2]?.status).toBe("zero");
-    expect(nudge(state, "comeback")).toBeUndefined();
+    expect(must(nudge(state, "comeback")).text).toBe("Coming back is easy on purpose: one set less, same weights.");
+    expect(nudge(state, "break_resume")).toBeUndefined(); // the comeback overrides the window the cardio started
     const plan = planSession(ctx, { code: "A", mode: "full" });
-    expect(plan.flags).not.toContain("comeback");
-    expect(plan.flags).toContain("break_resume"); // the cardio was the first session back: 85% window from Monday
-    expect(plan.exercises.map((e) => workSets(e).length)).toEqual([3, 3, 3, 2, 2, 2]);
+    expect(plan.flags).toContain("comeback");
+    expect(plan.flags).not.toContain("break_resume");
+    expect(plan.exercises.map((e) => workSets(e).length)).toEqual([2, 2, 2, 1, 1, 1]);
+    for (const pid of ["A1", "A2", "A3"]) {
+      const pe = planned(plan, pid);
+      expect(workSets(pe)[0]?.weight, pid).toBe(state.tracks[keyOf(pe)]?.base_weight);
+    }
+
+    // Replay agrees: Tuesday's A (logged without the comeback flag) is the comeback session and holds,
+    // and Thursday's B after it is a normal session that progresses.
+    const tue = strength({ code: "A", date: day(4, "tue"), log: { back_squat: sets(2, 70, 8, 4), bench_press: sets(2, 60, 8, 4) } });
+    const thu = strength({ code: "B", date: day(4, "thu"), log: dayLog("B", 2) });
+    const after = makeCtx({ now: at(day(4, "fri"), "07:00"), history: [history(), cardioMon, tue, thu] });
+    for (const c of summarizeSession(after, must(tue.id)).changes) expect(c.rule_id, c.exercise_id).toBe("event.comeback_hold");
+    const thuChanges = summarizeSession(after, must(thu.id)).changes;
+    expect(thuChanges.length).toBeGreaterThan(0);
+    for (const c of thuChanges) expect(c.rule_id.startsWith("dp.") || c.rule_id.startsWith("ro."), c.exercise_id).toBe(true);
+  });
+
+  it("6.4 zero week · a comeback after an 8 to 13 day gap keeps the same weights and starts no break window (comeback.overrides_short_break)", () => {
+    // 8 days: last session Sun CW2 (11-22), CW3 empty (zero), comeback Mon CW4 (11-30).
+    // 13 days: last session Fri CW2 (11-20), CW3 empty (zero), comeback Thu CW4 (12-03).
+    for (const [last, back] of [
+      [day(2, "sun"), day(4, "mon")],
+      [day(2, "fri"), day(4, "thu")],
+    ] as const) {
+      expect([8, 13]).toContain((Date.parse(back) - Date.parse(last)) / 86_400_000);
+      const before = strength({ code: "A", date: last, log: dayLog("A", 0) });
+      const ctx = makeCtx({ now: at(back, "07:00"), history: [steadyWeeks(1, 1, { cardio: false }), before] });
+      const state = computeState(ctx);
+      expect(state.weeks[2]?.status, back).toBe("zero");
+      const plan = state.next.plan;
+      expect(plan.flags, back).toContain("comeback");
+      expect(plan.flags, back).not.toContain("break_resume");
+      expect(plan.flags, back).not.toContain("long_break_restart");
+      for (const pe of plan.exercises) {
+        const base = state.tracks[keyOf(pe)]?.base_weight;
+        if (base == null) continue;
+        expect(workSets(pe).every((x) => x.weight === base), `${back} ${pe.prescription_id}`).toBe(true);
+      }
+      // The comeback session holds; the next session two days later is not inside an 85% window.
+      const code = state.next.code;
+      const comeback = strength({ code, date: back, time: "08:00", log: dayLog(code, 1, { sets: 1 }) });
+      const twoDaysOn = at(addDays(back, 2), "07:00");
+      const later = makeCtx({ now: twoDaysOn, history: [steadyWeeks(1, 1, { cardio: false }), before, comeback] });
+      for (const c of summarizeSession(later, must(comeback.id)).changes) expect(c.rule_id, back).toBe("event.comeback_hold");
+      const next = computeState(later);
+      expect(next.next.plan.flags, back).not.toContain("break_resume");
+      expect(next.next.plan.flags, back).not.toContain("comeback");
+      expect(next.nudges.map((x) => x.kind), back).not.toContain("break_resume");
+    }
   });
 
   it("6.4 zero week · block starts with a zero week: the comeback session calibrates without progressing, no second weight pick", () => {
@@ -459,12 +549,21 @@ describe("SPEC 6.4 · breaks", () => {
   });
 
   it("6.4 break · 14 days is still a short break, 15 days is a long break", () => {
-    // Last session Fri 11-27. CW4 is a zero week, so the comeback applies too.
-    const d14 = makeCtx({ now: at(day(5, "fri"), "07:00"), history: history() });
+    // Last session Fri 11-27. CW4 is a zero week, so the comeback applies too. A 14 day gap always spans a zero week,
+    // and since the rule change in ENGINE_RULES 4.5 the comeback overrides the short break (same weights). The
+    // boundary itself is checked with comeback.overrides_short_break off.
+    const both = (c: EngineConfig) => {
+      c.comeback.overrides_short_break = false;
+    };
+    const d14 = makeCtx({ now: at(day(5, "fri"), "07:00"), history: history(), config: both });
     const p14 = planSession(d14, { code: "A", mode: "full" });
     expect(p14.flags).toContain("break_resume");
     expect(p14.flags).not.toContain("long_break_restart");
     expect(p14.training_week).toBe(4);
+    const p14Default = planSession(makeCtx({ now: at(day(5, "fri"), "07:00"), history: history() }), { code: "A", mode: "full" });
+    expect(p14Default.flags).toContain("comeback");
+    expect(p14Default.flags).not.toContain("break_resume");
+    expect(p14Default.flags).not.toContain("long_break_restart");
 
     const d15 = makeCtx({ now: at(day(5, "sat"), "07:00"), history: history() });
     const p15 = planSession(d15, { code: "A", mode: "full" });

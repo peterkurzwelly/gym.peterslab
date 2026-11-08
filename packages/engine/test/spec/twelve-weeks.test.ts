@@ -134,33 +134,46 @@ describe("SPEC 9 phase 2 · zero week and comeback", () => {
     expect(s.block.extension_weeks).toBe(1);
   });
 
-  it("comeback session: A next, one set fewer and loads × 0.85 (zero week + short break both apply)", () => {
+  it("comeback session: A next, one set fewer and the same weights (comeback.overrides_short_break)", () => {
+    // Rule change (ENGINE_RULES 4.5): the 9 day gap also meets the short break rule, but the comeback overrides it.
+    // Before, both applied: loads × 0.85 and a break_resume nudge.
     const s = stateAt(T.comebackMorning);
     expect(s.next.code).toBe("A");
     const plan = s.next.plan;
-    expect(plan.flags).toEqual(expect.arrayContaining(["comeback", "break_resume"]));
+    expect(plan.flags).toContain("comeback");
+    expect(plan.flags).not.toContain("break_resume");
     expect(plan.training_week).toBe(7);
     for (const [pid, [n, kg, reps]] of Object.entries(EXPECTED.comeback)) {
       const pe = planned(plan, pid);
       expect(workSets(pe).length, pid).toBe(n);
       expect(workSets(pe).map((x) => [x.weight, x.reps]), pid).toEqual(Array.from({ length: n }, () => [kg, reps]));
     }
-    expect(s.nudges.map((n) => n.kind)).toEqual(expect.arrayContaining(["comeback", "break_resume"]));
+    expect(s.nudges.map((n) => n.kind)).toContain("comeback");
+    expect(s.nudges.map((n) => n.kind)).not.toContain("break_resume");
+    expect(s.nudges.find((n) => n.kind === "comeback")?.text).toBe("Coming back is easy on purpose: one set less, same weights.");
   });
 
-  it("the comeback and break resume sessions yield no progression decision", () => {
+  it("the comeback session yields no progression decision; the B after it progresses normally (no break window)", () => {
+    // Rule change (ENGINE_RULES 4.5, comeback.overrides_short_break): the comeback starts no 85% window, so Wednesday's
+    // B is an ordinary build session. Before, it was a break resume session and held too.
     const ctx = ctxAt(T.week8);
-    for (const id of [IDS.comeback, IDS.breakResume]) {
-      const summary = summarizeSession(ctx, id);
-      expect(summary.changes.length, id).toBeGreaterThan(0);
-      for (const c of summary.changes) expect(["event.comeback_hold", "event.break_hold"], `${id} ${c.exercise_id}`).toContain(c.rule_id);
-    }
+    const comeback = summarizeSession(ctx, IDS.comeback);
+    expect(comeback.changes.length).toBeGreaterThan(0);
+    for (const c of comeback.changes) expect(c.rule_id, c.exercise_id).toBe("event.comeback_hold");
+    const b = summarizeSession(ctx, IDS.afterComeback);
+    expect(b.changes.map((c) => [c.exercise_id, c.rule_id, c.to])).toEqual([
+      ["trap_bar_deadlift", "dp.hold_add_reps", { weight: 97.5, reps: 6 }],
+      ["overhead_press", "dp.hold_add_reps", { weight: 42.5, reps: 10 }],
+    ]);
     const before = stateAt(T.comebackMorning);
     const after = stateAt(T.week8);
+    const bTracks = new Set(["trap_bar_deadlift@4-6", "overhead_press@6-10"]);
     for (const [key, t] of Object.entries(before.tracks)) {
+      if (bTracks.has(key)) continue;
       expect(after.tracks[key]?.base_weight, key).toBe(t.base_weight);
       expect(after.tracks[key]?.base_reps, key).toBe(t.base_reps);
     }
+    expect(after.tracks["trap_bar_deadlift@4-6"]?.base_weight).toBe(97.5);
   });
 
   it("repairing the zero week freezes the streak but still extends the block and keeps the comeback (D9)", () => {

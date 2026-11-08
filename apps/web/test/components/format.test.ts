@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exerciseSummary, lastTimeText } from "../../src/components/ExerciseCard";
-import { changeDelta } from "../../src/components/SummaryView";
+import { changeDelta, changeDeltaFor, changeNextLine } from "../../src/components/SummaryView";
 import { weekDoneText } from "../../src/components/WeekCard";
 import { backSquat, benchTopSet, farmersCarry, goals, plank, pullUp, splitSquat, summaryA, weekTarget } from "../../src/components/__fixtures__";
 import { fmtAmount, fmtApproxMin, fmtClock, fmtKg, fmtKgDelta, fmtLoad, fmtLocalDate, fmtMinutes, fmtRange, fmtRangeAmount, fmtRelativeDate } from "../../src/lib/format";
@@ -66,5 +66,19 @@ describe("component text helpers", () => {
 
   it("summary deltas", () => {
     expect(summaryA.changes.map(changeDelta)).toEqual(["+2.5 kg", "+5 kg", "same"]);
+  });
+
+  it("summary next lines respect bodyweight and timed work", () => {
+    const plankShape = { bodyweight: true, measure: "seconds" as const };
+    expect(changeNextLine({ weight: 0, reps: 45 }, plankShape)).toBe("Next: 45 s");
+    expect(changeNextLine({ weight: 5, reps: 6 }, { bodyweight: true })).toBe("Next: BW+5 × 6");
+    expect(changeNextLine({ weight: 62.5, reps: 8 })).toBe("Next: 62.5 kg × 8");
+    expect(changeNextLine({ weight: 10, reps: 12 }, { per_hand: true })).toBe("Next: 10 kg/hand × 12");
+    expect(changeNextLine({ weight: 0, reps: 45 })).toBe("Next: 45");
+    const base = { exercise_id: "plank", name: "Plank", rule_id: "dp.increase", decision_id: "d1", explanation: "" };
+    expect(changeDeltaFor({ ...base, from: { weight: 0, reps: 30 }, to: { weight: 0, reps: 45 } }, plankShape)).toBe("aim 45 s");
+    expect(changeDeltaFor({ ...base, from: null, to: { weight: 0, reps: 30 } }, plankShape)).toBe("aim 30 s");
+    expect(changeDeltaFor({ ...base, from: { weight: null, reps: 8 }, to: { weight: 25, reps: 8 } })).toBe("25 kg");
+    expect(changeDeltaFor({ ...base, from: { weight: null, reps: 12 }, to: { weight: 10, reps: 12 } }, { per_hand: true })).toBe("10 kg/hand");
   });
 });

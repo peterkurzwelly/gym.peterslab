@@ -26,6 +26,14 @@ async function added(fn: () => Promise<unknown>): Promise<string[]> {
 }
 
 describe("repo writes", () => {
+  it("updateSettings on a fresh database creates the row and applies the patch in one transaction", async () => {
+    // Regression: with a plain arrow as the transaction scope this threw PrematureCommitError.
+    const s = await repo.updateSettings({ sound: false });
+    expect(s.sound).toBe(false);
+    expect((await db.settings.get("settings"))?.sound).toBe(false);
+    expect(await outboxKeys()).toEqual(["settings/settings", "settings/settings"]);
+  });
+
   it("every write enqueues an outbox entry for each row it changes", async () => {
     expect(await added(() => repo.ensureSettings())).toEqual(["settings/settings"]);
     expect(await added(() => repo.ensureSettings())).toEqual([]); // already there: no write

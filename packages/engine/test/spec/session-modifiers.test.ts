@@ -142,6 +142,32 @@ describe("SPEC 6.4 · daily readiness", () => {
     expect(benchChange.rule_id).toBe("dp.increase");
     expect(benchChange.to).toEqual({ weight: 72.5, reps: 5 });
   });
+
+  it("6.4 readiness · a check-in saved after the session does not make it a readiness hold (ENGINE_RULES 4.7)", () => {
+    // The session was started without a check-in, so it carries no readiness flag. A low check-in saved that evening
+    // must not rewrite what happened: squat and bench both progress.
+    const s = strength({ code: "A", date: day(5, "mon"), time: "07:00", log: { back_squat: sets(3, 100, 8, 3), bench_press: sets(3, 70, 8, 2) } });
+    const late = checkin(day(5, "mon"), [1, 2, 2, 2]);
+    late.checkins![0]!.updated_at = at(day(5, "mon"), "21:00");
+    const ctx = makeCtx({ now: at(day(5, "tue"), "08:00"), history: [steadyWeeks(1, 4), late, s] });
+    const changes = summarizeSession(ctx, must(s.id)).changes;
+    expect(changes.map((c) => c.rule_id).sort()).toEqual(["dp.increase", "dp.increase"]);
+    expect(changes.some((c) => c.rule_id === "event.readiness_hold")).toBe(false);
+  });
+
+  it("6.4 readiness · the plan's readiness flag, stored on the session at start, is what makes the hold", () => {
+    const ctx = readinessCtx([1, 2, 2, 2]);
+    const plan = planSession(ctx, { code: "A", mode: "full" });
+    expect(plan.flags).toContain("readiness");
+    const cardio = planSession(ctx, { code: "CARDIO", mode: "full" });
+    expect(cardio.flags).toContain("readiness");
+    // Started from that plan: flags copied into the session.
+    const s = strength({ code: "A", date: day(5, "mon"), flags: plan.flags, log: { back_squat: sets(2, 90, 8, 3), bench_press: sets(2, 70, 8, 2) } });
+    const after = makeCtx({ now: at(day(5, "tue"), "08:00"), history: [steadyWeeks(1, 4), s] }); // no check-in in history
+    const changes = summarizeSession(after, must(s.id)).changes;
+    expect(changes.find((c) => c.exercise_id === "back_squat")?.rule_id).toBe("event.readiness_hold");
+    expect(changes.find((c) => c.exercise_id === "bench_press")?.rule_id.startsWith("dp.")).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------- 30 minute mode and travel
@@ -217,6 +243,25 @@ describe("SPEC 6.4 · substitution", () => {
     expect([c3.exercise_id, c3.swapped]).toEqual(["one_arm_dumbbell_row", "limitation"]);
     const a3 = planned(planSession(ctx, { code: "A", mode: "full" }), "A3"); // no unilateral alternative → unchanged
     expect([a3.exercise_id, a3.swapped]).toEqual(["chest_supported_row", null]);
+  });
+
+  it("6.4 substitution · the planned exercise names its program default (primary_name), swapped or not", () => {
+    const ctx = makeCtx({ now, settings: { limitations: ["knee_friendly"] } });
+    const a = planSession(ctx, { code: "A", mode: "full", swaps: { A2: "dumbbell_bench_press" } });
+    expect(planned(a, "A1")).toMatchObject({ name: "Hack squat", primary_exercise_id: "back_squat", primary_name: "Back squat" });
+    expect(planned(a, "A2")).toMatchObject({ name: "Dumbbell bench press", primary_name: "Bench press", swapped: "session" });
+    expect(planned(a, "A3")).toMatchObject({ name: "Chest supported row", primary_name: "Chest supported row", swapped: null });
+  });
+
+  it("6.4 substitution · per_side follows the alternative when it says so (one-arm row, suitcase carry), else the prescription", () => {
+    const c = (swaps: Record<string, string>) => planSession(makeCtx({ now }), { code: "C", mode: "full", swaps });
+    expect([planned(c({}), "C3").per_side, planned(c({ C3: "one_arm_dumbbell_row" }), "C3").per_side, planned(c({ C3: "machine_row" }), "C3").per_side]).toEqual([false, true, false]);
+    expect([planned(c({}), "C7").per_side, planned(c({ C7: "suitcase_carry" }), "C7").per_side]).toEqual([false, true]);
+    // The shoulder_symmetry limitation swap to the one-arm row is per side too.
+    const lim = planned(planSession(makeCtx({ now, settings: { limitations: ["shoulder_symmetry"] } }), { code: "C", mode: "full" }), "C3");
+    expect([lim.exercise_id, lim.per_side]).toEqual(["one_arm_dumbbell_row", true]);
+    // B4 Bulgarian split squat is per side; walking lunge has no override and inherits it.
+    expect(planned(planSession(makeCtx({ now }), { code: "B", mode: "full", swaps: { B4: "walking_lunge" } }), "B4").per_side).toBe(true);
   });
 
   it("6.4 substitution · no limitations: program defaults, every alternative allowed", () => {

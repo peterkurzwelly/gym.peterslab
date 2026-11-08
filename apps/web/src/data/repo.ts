@@ -57,7 +57,10 @@ function makeWriter(now: string): Writer {
 /** Runs fn in one rw transaction over the given tables + outbox, then nudges sync. */
 async function write<R>(tables: SyncTable[], fn: (w: Writer) => Promise<R>): Promise<R> {
   const w = makeWriter(nowIso());
-  const result = await db.transaction("rw", [db.outbox, ...tables.map((t) => db.table(t))], () => fn(w));
+  // The scope must be an async function: Dexie only keeps its transaction zone across native awaits
+  // for async scopes. A plain arrow returning fn's promise lost the zone on longer chains (updateSettings
+  // on a fresh database) and threw PrematureCommitError.
+  const result = await db.transaction("rw", [db.outbox, ...tables.map((t) => db.table(t))], async () => fn(w));
   syncClient.notifyWrite();
   return result;
 }

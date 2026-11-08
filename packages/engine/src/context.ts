@@ -18,6 +18,7 @@ import type {
   SetLog,
   Settings,
 } from "@gym/schema";
+import { Settings as SettingsSchema } from "@gym/schema";
 import type { EngineContext } from "./types";
 import { isValidTimeZone, localDate, toIso, weekStart } from "./dates";
 
@@ -32,6 +33,8 @@ export interface Slot {
   rep_max: number;
   measure: Measure;
   progression_rule: ProgressionRule;
+  /** alternative.per_side ?? prescription.per_side. */
+  per_side: boolean;
   key: string;
   alternative: Alternative | null;
 }
@@ -116,6 +119,7 @@ export function resolveSlot(day: ProgramDay, p: Prescription, exerciseId: string
   let rep_max = p.rep_max;
   let measure: Measure = p.measure;
   let progression_rule: ProgressionRule = p.progression_rule;
+  let per_side = p.per_side;
   let alternative: Alternative | null = null;
   if (exerciseId !== p.exercise_id) {
     alternative = p.alternatives.find((a) => a.exercise_id === exerciseId) ?? null;
@@ -124,12 +128,24 @@ export function resolveSlot(day: ProgramDay, p: Prescription, exerciseId: string
       rep_max = alternative.rep_max ?? p.rep_max;
       measure = alternative.measure ?? p.measure;
       progression_rule = alternative.progression_rule ?? p.progression_rule;
+      per_side = alternative.per_side ?? p.per_side;
     } else if (exercise) {
       measure = exercise.measure;
     }
   }
   if (rep_max < rep_min) rep_max = rep_min;
-  return { prescription: p, day, exercise_id: exerciseId, rep_min, rep_max, measure, progression_rule, key: trackKey(exerciseId, rep_min, rep_max), alternative };
+  return {
+    prescription: p,
+    day,
+    exercise_id: exerciseId,
+    rep_min,
+    rep_max,
+    measure,
+    progression_rule,
+    per_side,
+    key: trackKey(exerciseId, rep_min, rep_max),
+    alternative,
+  };
 }
 
 function kindOf(code: DayCode): SessionKind {
@@ -140,8 +156,22 @@ function kindOf(code: DayCode): SessionKind {
 
 const notDeleted = <T extends { deleted_at: string | null }>(r: T) => r.deleted_at == null;
 
+/**
+ * Settings rows written before evening_hour / week_killers existed lack them: fill the schema defaults
+ * (evening_hour null stays null, it means off).
+ */
+export function withSettingsDefaults(s: Settings): Settings {
+  if (s.evening_hour !== undefined && s.week_killers !== undefined) return s;
+  return {
+    ...s,
+    evening_hour: s.evening_hour === undefined ? SettingsSchema.shape.evening_hour.parse(undefined) : s.evening_hour,
+    week_killers: s.week_killers ?? SettingsSchema.shape.week_killers.parse(undefined),
+  };
+}
+
 export function normalize(ctx: EngineContext, opts: AnalyzeOptions = {}): Norm {
-  const { config, program, settings } = ctx;
+  const { config, program } = ctx;
+  const settings = withSettingsDefaults(ctx.settings);
   const tz = settings.timezone && isValidTimeZone(settings.timezone) ? settings.timezone : config.timezone_default;
   // Canonical ISO (with ms) so every decision date validates against the schema.
   const nowMs = Date.parse(ctx.now);

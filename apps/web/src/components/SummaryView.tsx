@@ -1,6 +1,7 @@
 import type { SessionChange, SessionSummary } from "@gym/engine";
+import type { ReactNode } from "react";
 import { cx } from "../lib/cx";
-import { fmtInt, fmtKg, fmtKgDelta, fmtMinutes } from "../lib/format";
+import { fmtAmount, fmtInt, fmtKg, fmtKgDelta, fmtLoad, fmtMinutes, type AmountShape, type LoadShape } from "../lib/format";
 import { Button } from "./Button";
 import { SectionHeader } from "./SectionHeader";
 import { WeekLine, type WeekGoals } from "./WeekCard";
@@ -11,8 +12,14 @@ export interface SummaryViewProps {
   /** Block length for "Week 3 of 12" in the week line. */
   blockWeeks?: number;
   goals?: WeekGoals;
+  /** Extra line under the stats, e.g. what a cardio session logged. */
+  detail?: ReactNode;
+  /** Exercise shapes by id (ctx.exercises), so bodyweight and timed work read "45 s" instead of "0 kg × 45". */
+  exercises?: Record<string, ExerciseShape>;
   className?: string;
 }
+
+export type ExerciseShape = LoadShape & AmountShape;
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -25,25 +32,46 @@ function sessionTitle(s: SessionSummary): string {
 
 /** The headline delta for a change: "+2.5 kg", "aim 8", "same". */
 export function changeDelta(c: SessionChange): string {
+  return changeDeltaFor(c);
+}
+
+/** changeDelta with the exercise's shape: "aim 45 s" for timed work. */
+export function changeDeltaFor(c: SessionChange, shape?: ExerciseShape): string {
   const { from, to } = c;
   if (!to) return "";
   if (from?.weight != null && to.weight != null && from.weight !== to.weight) return `${fmtKgDelta(to.weight - from.weight)} kg`;
-  if (from && to.reps !== from.reps) return `aim ${to.reps}`;
-  if (!from && to.weight != null) return `${fmtKg(to.weight)} kg`;
+  // After a calibration exposure the old base has no weight: show the new load, not "aim n".
+  if ((!from || from.weight == null) && to.weight != null && to.weight > 0) return `${fmtKg(to.weight)} kg${shape?.per_hand ? "/hand" : ""}`;
+  if (from && to.reps !== from.reps) return `aim ${fmtAmount(to.reps, shape)}`;
+  if (!from) return `aim ${fmtAmount(to.reps, shape)}`;
   return "same";
 }
 
-export function SummaryView({ summary, onDone, blockWeeks, goals, className }: SummaryViewProps) {
+/** "Next: 62.5 kg × 8", "Next: 10 kg/hand × 12", "Next: BW+5 × 6", "Next: 45 s" (no load for plain bodyweight work). */
+export function changeNextLine(to: { weight: number | null; reps: number }, shape?: ExerciseShape): string {
+  const amount = fmtAmount(to.reps, shape);
+  const w = to.weight ?? 0;
+  if (w <= 0) return `Next: ${amount}`;
+  const load = shape?.bodyweight ? fmtLoad(w, shape) : `${fmtKg(w)} kg${shape?.per_hand ? "/hand" : ""}`;
+  return `Next: ${load} × ${amount}`;
+}
+
+export function SummaryView({ summary, onDone, blockWeeks, goals, detail, exercises, className }: SummaryViewProps) {
   const s = summary;
   return (
     <div className={cx("flex flex-col gap-5", className)}>
       <header>
         <div className="text-[11px] uppercase tracking-[0.16em] text-paper-faint">Summary</div>
         <h1 className="m-0 mt-1 font-display text-[46px] font-normal leading-[1.02] tracking-[-0.01em] text-paper">{sessionTitle(s)}</h1>
-        <p className="mt-2 text-[14px] tabular-nums text-paper-dim">
-          {fmtMinutes(s.duration_min)} · {s.sets_logged} sets
-          {s.kg_lifted > 0 && ` · ${fmtInt(s.kg_lifted)} kg`}
-        </p>
+        {/* Cardio with a detail line says what was logged; the session clock adds nothing there. */}
+        {!(s.code === "CARDIO" && detail) && (
+          <p className="mt-2 text-[14px] tabular-nums text-paper-dim">
+            {fmtMinutes(s.duration_min)}
+            {s.code !== "CARDIO" && ` · ${s.sets_logged} sets`}
+            {s.kg_lifted > 0 && ` · ${fmtInt(s.kg_lifted)} kg`}
+          </p>
+        )}
+        {detail && <div className="mt-2 text-[14px] tabular-nums text-paper">{detail}</div>}
       </header>
 
       <div className="rounded-[3px] border border-line px-4 py-3">
@@ -60,13 +88,11 @@ export function SummaryView({ summary, onDone, blockWeeks, goals, className }: S
               <li key={c.decision_id} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="min-w-0 text-[15px] font-medium text-paper">{c.name}</span>
-                  <span className="shrink-0 text-[15px] font-semibold tabular-nums text-paper">{changeDelta(c)}</span>
+                  <span className="shrink-0 text-[15px] font-semibold tabular-nums text-paper">{changeDeltaFor(c, exercises?.[c.exercise_id])}</span>
                 </div>
                 <p className="mt-1 text-[13px] leading-snug text-paper-dim">{c.explanation}</p>
                 {c.to && c.to.weight != null && (
-                  <p className="mt-0.5 text-[12px] tabular-nums text-paper-faint">
-                    Next: {fmtKg(c.to.weight)} kg × {c.to.reps}
-                  </p>
+                  <p className="mt-0.5 text-[12px] tabular-nums text-paper-faint">{changeNextLine(c.to, exercises?.[c.exercise_id])}</p>
                 )}
               </li>
             ))}

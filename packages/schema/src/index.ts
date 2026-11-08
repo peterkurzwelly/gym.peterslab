@@ -112,6 +112,8 @@ export const Alternative = z.object({
   rep_max: z.number().int().positive().optional(),
   measure: Measure.optional(),
   progression_rule: ProgressionRule.optional(),
+  /** Overrides prescription.per_side when this alternative is used (e.g. one-arm row). */
+  per_side: z.boolean().optional(),
 });
 export type Alternative = z.infer<typeof Alternative>;
 
@@ -289,7 +291,12 @@ export const EngineConfig = z.object({
     min_sets: z.number().int(),
   }),
   short_version: z.object({ set_reduction: z.number().int(), min_sets: z.number().int() }),
-  comeback: z.object({ set_reduction: z.number().int(), min_sets: z.number().int() }),
+  comeback: z.object({
+    set_reduction: z.number().int(),
+    min_sets: z.number().int(),
+    /** true: a comeback after a zero week keeps the same weights even when the gap also meets the short break rule (PROGRAM.md rule 4). */
+    overrides_short_break: z.boolean(),
+  }),
   break: z.object({
     short_days_min: z.number().int(),
     short_days_max: z.number().int(),
@@ -320,6 +327,9 @@ export const EngineConfig = z.object({
 export type EngineConfig = z.infer<typeof EngineConfig>;
 
 // ---------- synced tables ----------
+export const WeekKiller = z.enum(["work_peaks", "travel", "evenings", "low_energy"]);
+export type WeekKiller = z.infer<typeof WeekKiller>;
+
 export const RememberedWeight = z.object({ weight: z.number().nonnegative(), reps: z.number().int().positive() });
 export type RememberedWeight = z.infer<typeof RememberedWeight>;
 
@@ -340,6 +350,10 @@ export const Settings = z.object({
   increment_overrides: z.record(z.string(), z.number().positive()),
   start_pct: z.number().min(0.5).max(0.7),
   sound: z.boolean(),
+  /** Local hour from which the app leads with the ★ 30 min version (week killer "evenings"). null = off. */
+  evening_hour: z.number().int().min(0).max(23).nullable().default(19),
+  /** What usually kills Peter's weeks (SPEC 11.5); decides which fallback the app pushes hardest. */
+  week_killers: z.array(WeekKiller).default(["work_peaks", "travel", "evenings"]),
   ...syncFields,
 });
 export type Settings = z.infer<typeof Settings>;

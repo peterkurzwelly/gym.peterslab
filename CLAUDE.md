@@ -34,4 +34,4 @@ Read first: `docs/SPEC.md` (what), `docs/PROGRAM.md` (training content), `docs/E
 5. Design: ink `#04261E` background, paper `#F2EDD5` text, one orange accent `#F26716` for primary actions. Green only for floor/target reached. Instrument Serif for display, IBM Plex Mono for everything else. Tokens in `apps/web/src/styles.css`.
 6. iPhone first: primary actions in the bottom third, ≥ 44 pt tap targets, safe area insets, no modals during logging, no keyboard unless a field is tapped.
 7. Rows: ULID ids (except deterministic singleton ids), `updated_at` ISO UTC, soft delete via `deleted_at`. Last write wins on `updated_at`.
-8. `/api` fails closed: Access JWT or sync key required. Secrets only in Worker secrets, never in this public repo.
+8. `/api` fails closed: Access JWT or sync key required, except `GET/HEAD` on `/api/health`, `/api/auth/login` and `/api/ics` (echoes its query into a calendar file, no stored data; still rate limited). Secrets only in Worker secrets, never in this public repo.

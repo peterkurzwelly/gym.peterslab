@@ -15,8 +15,11 @@ export const MAX_BODY_BYTES = 2 * 1024 * 1024;
 /** A full backup outgrows 2 MB within a year of logging, and a replace import cannot be split up. */
 export const MAX_IMPORT_BYTES = 16 * 1024 * 1024;
 
-/** Routes that skip auth (GET/HEAD only). */
-const PUBLIC_PATHS = new Set(["/api/health", "/api/auth/login"]);
+/**
+ * Routes that skip auth (GET/HEAD only). /api/ics carries no stored data (it echoes its query into a calendar file)
+ * and is opened with a plain navigation, which cannot add the sync key header. All of these stay rate limited.
+ */
+const PUBLIC_PATHS = new Set(["/api/health", "/api/auth/login", "/api/ics"]);
 
 function issues(error: z.ZodError) {
   return error.issues.slice(0, 10).map((i) => ({ path: i.path.join("."), message: i.message }));

@@ -48,4 +48,13 @@ describe("defaultSettings", () => {
     expect(s.timezone).toBe(config.timezone_default);
     expect(s.limitations).toEqual([]);
   });
+
+  test("week killers and evening hour from Peter's answers (D17), equal to the schema defaults", () => {
+    const s = defaultSettings(config, program, "2026-11-08T10:00:00.000Z");
+    expect(s.evening_hour).toBe(19);
+    expect(s.week_killers).toEqual(["work_peaks", "travel", "evenings"]);
+    expect(s.interval_modality).toBe("both");
+    const { evening_hour: _e, week_killers: _w, ...rest } = s;
+    expect(Settings.parse(rest)).toMatchObject({ evening_hour: s.evening_hour, week_killers: s.week_killers });
+  });
 });

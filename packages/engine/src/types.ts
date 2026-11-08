@@ -153,6 +153,7 @@ export interface PlannedExercise {
   name: string;
   /** Program default exercise for this prescription. */
   primary_exercise_id: string;
+  primary_name: string;
   swapped: null | "session" | "block" | "limitation";
   starred: boolean;
   main_lift: boolean;
@@ -254,6 +255,14 @@ export interface NextSession {
   done_today: boolean;
   /** Full version plan with today's check-in applied. */
   plan: SessionPlan;
+  /**
+   * Which version the Today screen should lead with. "short" when the never miss twice nudge is on,
+   * when the floor is at risk and settings.week_killers has "work_peaks", or after settings.evening_hour
+   * when week_killers has "evenings". See ENGINE_RULES 5.
+   */
+  recommended_mode: "full" | "short";
+  recommended_rule_id: string | null;
+  recommended_reason: string | null;
 }
 
 export interface ReadinessResult {

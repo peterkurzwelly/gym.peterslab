@@ -1,10 +1,10 @@
 /** Readiness, spacing warnings, nudges and flags. */
-import type { Checkin, DayCode } from "@gym/schema";
+import type { Checkin, DayCode, StrengthDayCode } from "@gym/schema";
 import type { Flag, NextSession, Nudge, ReadinessResult, SpacingWarning, WeekVolume } from "./types";
 import type { Analysis } from "./analysis";
 import type { Norm } from "./context";
 import { checkinAverage } from "./context";
-import { addDays, daysBetween, isoWeekday, localMidnightMs } from "./dates";
+import { addDays, daysBetween, isoWeekday, localHour, localMidnightMs } from "./dates";
 import { lerpClamped, round2 } from "./calc";
 import { nextInLine } from "./analysis";
 import { lastZeroWeekBefore } from "./weeks";
@@ -82,24 +82,35 @@ export interface PlanModifiers {
   gapDays: number | null;
   longBreak: boolean;
   breakResume: boolean;
+  /** The short break rule matched before the comeback override (buildPlan re-checks it for a manual comeback mode). */
+  rawShortBreak: boolean;
   /** The current week restarted because of a long break. */
   restart: boolean;
 }
 
-/** Comeback and break state for a session started at analysis time (`at`). */
+/**
+ * Short break (`event.break_short`) applies, given whether the session is a comeback: with
+ * comeback.overrides_short_break a comeback keeps the same weights instead (ENGINE_RULES 4.5, PROGRAM.md rule 4).
+ */
+export function shortBreakApplies(n: Norm, raw: boolean, comeback: boolean, longBreak: boolean): boolean {
+  return raw && !longBreak && !(comeback && n.config.comeback.overrides_short_break);
+}
+
+/** Comeback and break state for a strength or travel session started at analysis time (`at`). */
 export function planModifiers(an: Analysis): PlanModifiers {
   const { n, wc, rp } = an;
   const b = n.config.break;
   const zero = lastZeroWeekBefore(wc, n.today);
+  // ENGINE_RULES 4.5: no qualifying strength or travel session since the zero week ended (cardio does not cancel it).
+  const lastSt = rp.lastStrengthOrTravel;
+  const comeback = zero != null && (!lastSt || lastSt.date <= zero.end);
   const last = rp.lastQualifying;
-  // ENGINE_RULES 4.5: no qualifying session (cardio included) since the zero week.
-  const comeback = zero != null && (!last || last.date < zero.start);
   const gapDays = last ? daysBetween(last.date, n.today) : null;
   const longBreak = gapDays != null && gapDays > b.short_days_max;
-  const breakResume =
-    !longBreak && gapDays != null && (gapDays >= b.short_days_min || (rp.breakWindowEnd != null && n.today <= rp.breakWindowEnd));
+  const rawShort = gapDays != null && (gapDays >= b.short_days_min || (rp.breakWindowEnd != null && n.today <= rp.breakWindowEnd));
+  const breakResume = shortBreakApplies(n, rawShort, comeback, longBreak);
   const restart = wc.current.prospectiveRestart || wc.current.restartSessionId != null;
-  return { comeback, gapDays, longBreak, breakResume, restart };
+  return { comeback, gapDays, longBreak, breakResume, rawShortBreak: rawShort && !longBreak, restart };
 }
 
 // ---------------- spacing ----------------
@@ -160,12 +171,68 @@ export function spacing(an: Analysis, code: DayCode, intensity: "easy" | "hard")
 
 // ---------------- nudges ----------------
 
+/** Never miss twice (`event.never_miss_twice`): floor not reached and enough hours since the last strength session (or block start). */
+export function neverMissTwice(an: Analysis, code: StrengthDayCode, doneToday: boolean): Nudge | null {
+  const { n, wf } = an;
+  if (wf.current.floor_reached || doneToday) return null;
+  const blockStartMs = localMidnightMs(n.blockStart, n.tz);
+  const last = an.rp.lastStrengthLike;
+  const lastMs = last ? Date.parse(last.endedIso ?? last.lastActivityIso) : -Infinity;
+  const refMs = Math.max(lastMs, blockStartMs);
+  if (n.atMs - refMs < n.config.never_miss_twice.hours * 3_600_000) return null;
+  const day = n.dayByCode.get(code);
+  const short = day?.has_short_version && day.short_minutes;
+  return {
+    kind: "never_miss_twice",
+    rule_id: "event.never_miss_twice",
+    text: short ? `Never miss twice: ★ ${day.short_minutes} min version of ${code} is enough today.` : `Never miss twice: session ${code} fits today.`,
+    action: { mode: short ? "short" : "full", code },
+  };
+}
+
+export interface Recommendation {
+  mode: "full" | "short";
+  rule_id: string | null;
+  reason: string | null;
+}
+
+/**
+ * Which version the Today screen leads with (`plan.recommend_short`, ENGINE_RULES 5), first match wins:
+ * never miss twice → floor at risk (week killer work_peaks) → after the evening hour (week killer evenings) → full.
+ * Only days with a short version recommend it. Nothing before the block starts; the evening rule is about
+ * today, so it does not fire when a strength session is already done today (never stack).
+ */
+export function recommendVersion(an: Analysis, code: StrengthDayCode, doneToday: boolean): Recommendation {
+  const { n, wf } = an;
+  const full: Recommendation = { mode: "full", rule_id: null, reason: null };
+  const day = n.dayByCode.get(code);
+  const mins = day?.has_short_version ? day.short_minutes : null;
+  if (!mins || n.today < n.blockStart) return full;
+  const version = `the ${mins} min version counts fully.`;
+
+  const nmt = neverMissTwice(an, code, doneToday);
+  if (nmt) return { mode: "short", rule_id: nmt.rule_id, reason: nmt.text };
+
+  const killers = n.settings.week_killers ?? [];
+  const cur = wf.current;
+  if (killers.includes("work_peaks") && !cur.floor_reached && n.today >= cur.start_date && n.today <= cur.end_date) {
+    const daysLeft = daysBetween(n.today, cur.end_date) + 1;
+    const needed = Math.max(0, n.config.week.strength_floor - cur.strength_done);
+    if (daysLeft <= needed + 1) return { mode: "short", rule_id: "plan.floor_at_risk", reason: `Floor at risk: ${version}` };
+  }
+
+  const hour = n.settings.evening_hour;
+  if (killers.includes("evenings") && hour != null && !doneToday && localHour(n.atIso, n.tz) >= hour) {
+    return { mode: "short", rule_id: "plan.evening", reason: `After ${String(hour).padStart(2, "0")}:00: ${version}` };
+  }
+  return full;
+}
+
 export function buildNudges(an: Analysis, next: NextSession, mods: PlanModifiers): Nudge[] {
   const { n, wf } = an;
   const out: Nudge[] = [];
   const cur = wf.current;
   const code = next.code;
-  const day = n.dayByCode.get(code);
   const b = n.config.break;
 
   if (wf.block.complete) {
@@ -200,22 +267,8 @@ export function buildNudges(an: Analysis, next: NextSession, mods: PlanModifiers
     }
   }
 
-  // Never miss twice: floor not reached and enough hours since the last strength session (or block start).
-  if (!cur.floor_reached && !next.done_today) {
-    const blockStartMs = localMidnightMs(n.blockStart, n.tz);
-    const last = an.rp.lastStrengthLike;
-    const lastMs = last ? Date.parse(last.endedIso ?? last.lastActivityIso) : -Infinity;
-    const refMs = Math.max(lastMs, blockStartMs);
-    if (n.atMs - refMs >= n.config.never_miss_twice.hours * 3_600_000) {
-      const short = day?.has_short_version && day.short_minutes;
-      out.push({
-        kind: "never_miss_twice",
-        rule_id: "event.never_miss_twice",
-        text: short ? `Never miss twice: ★ ${day.short_minutes} min version of ${code} is enough today.` : `Never miss twice: session ${code} fits today.`,
-        action: { mode: short ? "short" : "full", code },
-      });
-    }
-  }
+  const nmt = neverMissTwice(an, code, next.done_today);
+  if (nmt) out.push(nmt);
 
   const weekday = isoWeekday(n.today);
   const floorWord = numberWord(n.config.week.strength_floor);

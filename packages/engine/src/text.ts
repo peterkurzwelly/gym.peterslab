@@ -38,7 +38,10 @@ export function timesWord(n: number): string {
   return `${n} times`;
 }
 
-/** Comeback line. Says "same weights" only when no break lowers them (a zero week usually comes with a break). */
+/**
+ * Comeback line. Says "same weights" unless a break lowers them: a long break does, a short break only when
+ * comeback.overrides_short_break is false (by default the comeback keeps the same weights, PROGRAM.md rule 4).
+ */
 export function comebackText(setReduction: number, lighter: boolean): string {
   const sets = `${numberWord(setReduction)} set${setReduction === 1 ? "" : "s"} less`;
   return `Coming back is easy on purpose: ${sets}, ${lighter ? "lighter weights to ease in" : "same weights"}.`;

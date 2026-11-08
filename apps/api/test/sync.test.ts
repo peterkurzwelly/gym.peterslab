@@ -203,6 +203,36 @@ describe("POST /api/sync", () => {
     expect(res.cursor).toBe(1);
   });
 
+  it("a cursor ahead of the reset server counts as 0 even when the same request's push lifts the rev past it", async () => {
+    // Another device wrote 2 rows after the reset (revs 1, 2). This client still holds cursor 3 from the old database
+    // and pushes 3 rows (revs 3..5). Judged after its push, cursor 3 would look valid and revs 1..2 would be skipped.
+    await sync({ client_id: "ipad", changes: { checkin: [fixtures.checkin({ id: "ck_2026-11-01", date: "2026-11-01" }), fixtures.checkin({ id: "ck_2026-11-02", date: "2026-11-02" })] } });
+    const push = {
+      session: [fixtures.session({ id: "s_a" }), fixtures.session({ id: "s_b" }), fixtures.session({ id: "s_c" })],
+    };
+    const res = await sync({ cursor: 3, changes: push });
+    expect(res.accepted).toBe(3);
+    expect(res.changes.checkin?.map((r) => r.id).sort()).toEqual(["ck_2026-11-01", "ck_2026-11-02"]);
+    expect(res.changes.session).toHaveLength(3);
+    expect(res.cursor).toBe(5);
+    // A cursor equal to the server rev is normal: nothing new.
+    const again = await sync({ cursor: 5 });
+    expect(Object.values(again.changes).flat()).toEqual([]);
+    expect(again.cursor).toBe(5);
+  });
+
+  it("settings round trip evening_hour and week_killers; an older client's row gets the defaults", async () => {
+    const mine = fixtures.settings({ evening_hour: null, week_killers: ["travel"] });
+    await sync({ changes: { settings: [mine] } });
+    expect((await sync({ client_id: "ipad" })).changes.settings).toEqual([mine]);
+
+    await resetDb();
+    const { evening_hour: _e, week_killers: _w, ...legacy } = fixtures.settings();
+    const res = await sync({ changes: { settings: [legacy] } });
+    expect(res.accepted).toBe(1);
+    expect(res.changes.settings?.[0]).toMatchObject({ evening_hour: 19, week_killers: ["work_peaks", "travel", "evenings"] });
+  });
+
   it("rejects a malformed envelope with 400", async () => {
     for (const body of [
       { cursor: 0, changes: {} },

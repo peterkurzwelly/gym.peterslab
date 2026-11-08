@@ -75,9 +75,23 @@ export interface EngineResult {
 
 type SnapshotResult = { snapshot: DataSnapshot; error: null } | { snapshot: null; error: Error };
 
+/**
+ * The engine ignores sessions that start after ctx.now, so a write newer than the 30 s ticker (the
+ * session the first set just started) must move "now" forward before the next render. Rounded up to
+ * the next whole second so hook instances reading the same write still share one computeState.
+ * Silent on purpose: the live query result that follows re-renders with the new value.
+ */
+function advanceNowTo(iso: string) {
+  const ms = Math.ceil(Date.parse(iso) / 1000) * 1000;
+  const next = new Date(ms).toISOString();
+  if (next > currentNow) currentNow = next;
+}
+
 async function querySnapshot(): Promise<SnapshotResult> {
   try {
-    return { snapshot: await readSnapshot(), error: null };
+    const snapshot = await readSnapshot();
+    advanceNowTo(nowIso());
+    return { snapshot, error: null };
   } catch (e) {
     return { snapshot: null, error: toError(e) };
   }

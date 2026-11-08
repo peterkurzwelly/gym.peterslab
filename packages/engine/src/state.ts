@@ -5,7 +5,7 @@ import type { Analysis } from "./analysis";
 import { analyze, nextInLine, strengthToday } from "./analysis";
 import { dedupeDecisions, makeDecision, planId } from "./decisions";
 import { buildCardio } from "./cardio";
-import { buildFlags, buildNudges, planModifiers, readinessFor, readinessResult, spacing } from "./events";
+import { buildFlags, buildNudges, planModifiers, readinessFor, readinessResult, recommendVersion, spacing } from "./events";
 import { buildPlan } from "./planning";
 import { statsOut, trackOut } from "./progression";
 import { totals, weekVolumes } from "./volume";
@@ -29,7 +29,26 @@ export function buildNext(an: Analysis): { next: NextSession; decision: Decision
     output: { code: nl.code, done_today: doneToday },
     explanation: reason,
   });
-  const withDecision: SessionPlan = { ...plan, decisions: [...plan.decisions, decision] };
+  const rec = recommendVersion(an, nl.code, doneToday);
+  const extra = [decision];
+  if (rec.rule_id && rec.reason) {
+    extra.push(
+      makeDecision(n, {
+        id: planId(n.today, nl.code, rec.rule_id),
+        date: n.atIso,
+        rule_id: rec.rule_id,
+        inputs: {
+          floor_reached: an.wf.current.floor_reached,
+          strength_done: an.wf.current.strength_done,
+          week_killers: n.settings.week_killers,
+          evening_hour: n.settings.evening_hour,
+        },
+        output: { recommended_mode: rec.mode },
+        explanation: rec.reason,
+      }),
+    );
+  }
+  const withDecision: SessionPlan = { ...plan, decisions: [...plan.decisions, ...extra] };
   return {
     next: {
       code: nl.code as StrengthDayCode,
@@ -39,6 +58,9 @@ export function buildNext(an: Analysis): { next: NextSession; decision: Decision
       reason,
       done_today: doneToday,
       plan: withDecision,
+      recommended_mode: rec.mode,
+      recommended_rule_id: rec.rule_id,
+      recommended_reason: rec.reason,
     },
     decision,
   };

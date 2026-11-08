@@ -51,7 +51,7 @@
   },
   "deload": { "planned_week": 8, "sets_base_phase": "build", "sets_factor": 0.5, "sets_rounding": "ceil", "min_sets": 1 },
   "short_version": { "set_reduction": 1, "min_sets": 1 },
-  "comeback": { "set_reduction": 1, "min_sets": 1 },
+  "comeback": { "set_reduction": 1, "min_sets": 1, "overrides_short_break": true },
   "break": {
     "short_days_min": 7,
     "short_days_max": 14,

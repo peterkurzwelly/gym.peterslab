@@ -26,10 +26,31 @@ describe("auth matrix", () => {
   });
 
   it("nothing configured: every other route is closed", async () => {
-    for (const path of ["/api/auth/check", "/api/export", "/api/ics?start=2026-11-10T17:00:00Z", "/api/nope"]) {
+    for (const path of ["/api/auth/check", "/api/export", "/api/nope"]) {
       expect((await call(path, {}, noAuth)).status, path).toBe(401);
     }
     expect((await post("/api/import?mode=merge", {}, noAuth)).status).toBe(401);
+    expect((await post("/api/ics?start=2026-11-10T17:00:00Z", {}, noAuth)).status).toBe(401); // only GET/HEAD are public
+  });
+
+  it("GET /api/ics is public: a plain navigation cannot send the sync key, and the file holds no stored data", async () => {
+    const path = "/api/ics?title=Session%20B&start=2026-11-10T17:00:00Z&minutes=30";
+    for (const overrides of [noAuth, { ...noAuth, SYNC_TOKEN: TOKEN }]) {
+      const res = await call(path, {}, overrides);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("text/calendar; charset=utf-8");
+      expect(await res.text()).toContain("SUMMARY:Session B");
+    }
+    expect((await call(path, { method: "HEAD" }, noAuth)).status).toBe(200);
+    // Bad params are still a 400, not a leak of anything else.
+    expect((await call("/api/ics?start=nope", {}, noAuth)).status).toBe(400);
+  });
+
+  it("GET /api/ics stays rate limited", async () => {
+    const limiter = { limit: async () => ({ success: false }) } as unknown as RateLimit;
+    const res = await call("/api/ics?start=2026-11-10T17:00:00Z", { headers: { "CF-Connecting-IP": "203.0.113.9" } }, { ...noAuth, RATE_LIMITER: limiter });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "rate_limited" });
   });
 
   it("token configured, no credentials: 401 missing_credentials", async () => {

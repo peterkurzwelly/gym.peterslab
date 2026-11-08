@@ -60,6 +60,11 @@ export function localDate(iso: string, timeZone: string): string {
   return `${pad(p.y, 4)}-${pad(p.m)}-${pad(p.d)}`;
 }
 
+/** Local wall clock hour (0..23) of an ISO instant in an IANA timezone. */
+export function localHour(iso: string, timeZone: string): number {
+  return zonedParts(Date.parse(iso), timeZone).h;
+}
+
 /** Day number (days since 1970-01-01) of a local date string. */
 export function dayNumber(date: string): number {
   const [y, m, d] = date.split("-").map(Number);

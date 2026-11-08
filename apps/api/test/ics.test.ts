@@ -74,9 +74,10 @@ describe("GET /api/ics", () => {
     expect(await res.json()).toMatchObject({ error: "invalid_params" });
   });
 
-  it("requires auth", async () => {
+  it("is public: works without auth (the Today and Plan screens open it with a plain navigation)", async () => {
     const res = await call(qs({ start: "2026-11-10T17:00:00Z" }), {}, { DEV_ALLOW_ALL: undefined });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("BEGIN:VCALENDAR");
   });
 });
 

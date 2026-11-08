@@ -78,6 +78,8 @@ export interface Replay {
   breakWindowEnd: string | null;
   lastQualifying: NSession | null;
   lastStrengthLike: NSession | null;
+  /** Last qualifying strength or travel session (any travel, floor or not). Ends a pending comeback. */
+  lastStrengthOrTravel: NSession | null;
 }
 
 export interface Target {
@@ -361,6 +363,7 @@ export function replay(n: Norm, wc: WeeksCalc): Replay {
 
   let lastQ: NSession | null = null;
   let lastStrength: NSession | null = null;
+  let lastSt: NSession | null = null;
   let windowEnd: string | null = null;
   let deloadDone = false; // the planned deload week was already trained (e.g. before a long break restart)
 
@@ -371,31 +374,39 @@ export function replay(n: Norm, wc: WeeksCalc): Replay {
     const phase = tw != null ? phaseForWeek(program, config, tw, deloadWeeks) : null;
     const strengthish = s.kind !== "cardio";
 
+    // Comeback (ENGINE_RULES 4.5): first strength or travel session after a completed zero week, with no qualifying
+    // strength or travel session since that week ended. A cardio session in between does not cancel it.
+    const zero = lastZeroWeekBefore(wc, s.date);
+    const comeback =
+      strengthish &&
+      ((zero != null && (!lastSt || lastSt.date <= zero.end)) || s.s.mode === "comeback" || s.s.flags.includes("comeback"));
+
     // Breaks: gap since the previous qualifying session of any kind.
     const gap = lastQ ? daysBetween(lastQ.date, s.date) : null;
     const computedLong = gap != null && gap > cfgB.short_days_max;
-    const computedShortStart = !computedLong && gap != null && gap >= cfgB.short_days_min;
-    if (computedLong) windowEnd = null;
+    // comeback.overrides_short_break: a comeback keeps the same weights and does not start (or continue) a short break
+    // window, so the sessions after it progress normally. Long breaks still apply on top.
+    const overridesBreak = comeback && config.comeback.overrides_short_break && !computedLong;
+    const computedShortStart = !computedLong && !overridesBreak && gap != null && gap >= cfgB.short_days_min;
+    if (computedLong || overridesBreak) windowEnd = null;
     else if (computedShortStart) windowEnd = addDays(s.date, cfgB.short_duration_days - 1);
     const longBreakFirst = computedLong || (strengthish && s.s.flags.includes("long_break_restart"));
-    const breakResume = !longBreakFirst && ((windowEnd != null && s.date <= windowEnd) || (strengthish && s.s.flags.includes("break_resume")));
-
-    // Comeback: first strength session after a completed zero week, with no qualifying session of any kind since.
-    const zero = lastZeroWeekBefore(wc, s.date);
-    const comeback =
-      (s.strengthLike && zero != null && (!lastQ || lastQ.date < zero.start)) ||
-      (strengthish && (s.s.mode === "comeback" || s.s.flags.includes("comeback")));
+    const breakResume =
+      !longBreakFirst &&
+      !overridesBreak &&
+      ((windowEnd != null && s.date <= windowEnd) || (strengthish && s.s.flags.includes("break_resume")));
     const deload = phase?.name === "deload";
 
     lastQ = s;
     if (s.strengthLike) lastStrength = s;
+    if (strengthish) lastSt = s;
 
     const info: SessionInfo = {
       tw,
       phase,
       gapDays: gap,
       deload,
-      comeback: strengthish && comeback,
+      comeback,
       breakResume: strengthish && breakResume,
       longBreakFirst: strengthish && longBreakFirst,
       readinessCut: new Set(),
@@ -465,9 +476,9 @@ export function replay(n: Norm, wc: WeeksCalc): Replay {
         }
       }
 
-      // Readiness: the planned load cut applied to the scope exercises with a load.
-      const ck = n.checkinByDate.get(s.date);
-      if (ck && checkinAverage(ck) <= config.readiness.threshold) {
+      // Readiness: the session's own flag says a readiness adjustment was planned (written at start, or when a check-in
+      // was saved during the session). A check-in saved after the session never turns it into a hold.
+      if (s.s.flags.includes("readiness")) {
         const scope = new Set(readinessScope(n, s.code, s.s.mode));
         for (const [key, g] of groups) {
           const x = g[0]!;
@@ -704,6 +715,7 @@ export function replay(n: Norm, wc: WeeksCalc): Replay {
     breakWindowEnd: windowEnd,
     lastQualifying: lastQ,
     lastStrengthLike: lastStrength,
+    lastStrengthOrTravel: lastSt,
   };
 }
 

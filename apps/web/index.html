@@ -4,17 +4,85 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#04261E" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Consistency first training log." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Gym" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <link rel="icon" href="/pwa-64x64.png" sizes="64x64" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" sizes="180x180" />
     <title>Workout OS</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      // Service worker: the app shell works offline. A new version installs in the background
+      // (registerType autoUpdate) and the page reloads onto it only at an app open, before the
+      // first tap. Never while Peter is logging. Dexie (IndexedDB) is untouched by a reload.
+      import { registerSW } from "virtual:pwa-register";
+
+      const OPEN_AFTER_HIDDEN_MS = 30_000;
+      const CHECK_EVERY_MS = 5 * 60_000;
+      let touched = false;
+      let pendingReload = false;
+      let hiddenAt = 0;
+      let lastCheck = Date.now();
+
+      const reload = () => {
+        // Guard against a reload loop if something keeps failing.
+        try {
+          const last = Number(sessionStorage.getItem("sw-reload-at") || 0);
+          if (Date.now() - last < 10_000) return;
+          sessionStorage.setItem("sw-reload-at", String(Date.now()));
+        } catch {}
+        location.reload();
+      };
+
+      addEventListener("pointerdown", () => (touched = true), { capture: true, passive: true });
+      addEventListener("keydown", () => (touched = true), { capture: true });
+
+      // An old page lazily loading a chunk the new version removed: reload onto the new version.
+      const staleChunk = (msg) => /dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(msg || ""));
+      addEventListener("vite:preloadError", (e) => {
+        e.preventDefault();
+        reload();
+      });
+      addEventListener("error", (e) => {
+        if (staleChunk(e.message || e.error?.message)) reload();
+      });
+      addEventListener("unhandledrejection", (e) => {
+        if (staleChunk(e.reason?.message)) reload();
+      });
+
+      registerSW({
+        immediate: true,
+        // A new version is active. Reload now if Peter has not tapped since opening, else at the next open.
+        onNeedReload() {
+          if (!touched) reload();
+          else pendingReload = true;
+        },
+        onRegisteredSW(_url, registration) {
+          if (!registration) return;
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "hidden") {
+              hiddenAt = Date.now();
+              return;
+            }
+            // Back from the background after a while: that is an app open.
+            if (!hiddenAt || Date.now() - hiddenAt < OPEN_AFTER_HIDDEN_MS) return;
+            touched = false;
+            if (pendingReload) return reload();
+            if (Date.now() - lastCheck > CHECK_EVERY_MS && navigator.onLine !== false) {
+              lastCheck = Date.now();
+              registration.update().catch(() => {});
+            }
+          });
+        },
+      });
+    </script>
   </body>
 </html>

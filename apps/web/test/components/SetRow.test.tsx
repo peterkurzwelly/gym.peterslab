@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExerciseCard } from "../../src/components/ExerciseCard";
-import { SetRow } from "../../src/components/SetRow";
+import { SetRow, describeShort } from "../../src/components/SetRow";
 import { backSquat, benchCalibration, chestSupportedRow, plank, setLog, splitSquat } from "../../src/components/__fixtures__";
 
 afterEach(cleanup);
@@ -114,6 +114,25 @@ describe("calibration (no weight yet)", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Confirm set 2" }));
     expect(onConfirmSet).toHaveBeenCalledWith(benchCalibration.sets[1], { weight: 22.5, reps: 8, rir: 3 }, null);
+  });
+
+  it("a done calibration set as prescribed shows no target line; a later set compares with the picked weight", () => {
+    const first = setLog(benchCalibration, 0, 22.5, 8, 3);
+    const second = setLog(benchCalibration, 1, 22.5, 7, 3);
+    const { container } = render(
+      <ExerciseCard exercise={benchCalibration} logged={[first, second]} activeSetIndex={null} pain={false} equipment="barbell" onConfirmSet={() => {}} onPainChange={() => {}} />,
+    );
+    expect(container.textContent).not.toMatch(/pick ×/);
+    expect(screen.getAllByText(/^target /).map((n) => n.textContent)).toEqual(["target 22.5 × 8 @ 3"]);
+    expect(describeShort({ weight: null, reps: 8, rir: 3 }, benchCalibration)).toBe("8 @ 3");
+  });
+
+  it("travel circuit cards drop the superset badge", () => {
+    const ex = { ...backSquat, superset_group: "T" };
+    const { rerender } = render(<ExerciseCard exercise={ex} logged={[]} activeSetIndex={0} pain={false} onConfirmSet={() => {}} onPainChange={() => {}} />);
+    expect(screen.queryByText("Superset T")).not.toBeNull();
+    rerender(<ExerciseCard exercise={ex} logged={[]} activeSetIndex={0} pain={false} circuit onConfirmSet={() => {}} onPainChange={() => {}} />);
+    expect(screen.queryByText("Superset T")).toBeNull();
   });
 });
 

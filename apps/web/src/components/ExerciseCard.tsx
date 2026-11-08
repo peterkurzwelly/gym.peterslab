@@ -30,6 +30,8 @@ export interface ExerciseCardProps {
   position?: number;
   /** Local date today, to say "Yesterday" in the last time line. */
   today?: string;
+  /** Part of a travel circuit: every card shares one group, so the superset badge says nothing. */
+  circuit?: boolean;
   className?: string;
 }
 
@@ -56,7 +58,7 @@ export function lastTimeText(last: LastTime, ex: PlannedExercise): string {
 
 const SWAP_LABEL = { session: "Swapped today", block: "Swapped for block", limitation: "Limitation swap" } as const;
 
-export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onConfirmSet, onPainChange, onSwap, swapMode, equipment, position, today, className }: ExerciseCardProps) {
+export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onConfirmSet, onPainChange, onSwap, swapMode, equipment, position, today, circuit, className }: ExerciseCardProps) {
   const [altOpen, setAltOpen] = useState(false);
   const logs = logged.filter((l) => l.deleted_at == null && !l.is_warmup).sort((a, b) => a.set_index - b.set_index);
   const byIndex = new Map(logs.map((l) => [l.set_index, l]));
@@ -82,7 +84,7 @@ export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onCon
               ★
             </Badge>
           )}
-          {ex.superset_group && <Badge tone="neutral">Superset {ex.superset_group}</Badge>}
+          {ex.superset_group && !circuit && <Badge tone="neutral">Superset {ex.superset_group}</Badge>}
           {ex.swapped && <Badge tone="neutral">{SWAP_LABEL[ex.swapped]}</Badge>}
           {ex.stalled && <Badge tone="neutral">Stalled</Badge>}
           <span className="ml-auto text-[11px] tabular-nums text-paper-faint">

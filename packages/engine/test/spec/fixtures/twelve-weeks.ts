@@ -13,8 +13,9 @@
  *   - He logs the three starred exercises of each day. Reps sit mid range (never below range, never at the top of
  *     every set), so double progression always answers dp.hold_add_reps: base load = last eligible load.
  *   - Loads rise on every progression eligible exposure, so e1RM rises on every eligible exposure: no stall, no e1RM drop.
- *     Exception: overhead press, flat from CW9 (the stall). Non eligible sessions (deload, comeback, break) are logged at
- *     or below the previous eligible load, so they never set a new best.
+ *     Exceptions: overhead press repeats 42.5 kg in CW8 (no gain, no new best) and is flat at 45 kg from CW9 (the stall).
+ *     Non eligible sessions (deload, comeback) are logged at or below the previous eligible load, so they never set a
+ *     new best.
  *   - RIR 3 in return and deload weeks, RIR 2 from build on (always ≥ the phase target).
  *   - Check-ins exist only in CW4, so the check-in trigger can fire only there.
  *
@@ -28,11 +29,12 @@
  *     max_per_block = 1 and no later criteria are met → exactly one reactive_deload flag, no deload_criteria_met.
  *   Phases: tw1..4 return, tw5 deload (reactive), tw6..8 build, tw9..11 push, tw12 consolidate.
  *   Comeback (ENGINE_RULES 4.5 + 4.6): first strength session after the zero week is Mon 12-28 A. Last qualifying session
- *     before it: cardio Sat 12-19 (9 days; strength Thu 12-17, 11 days) → short break (7..14) as well → both apply:
- *     sets − 1 and loads × 0.85 rounded down. Short break window = 7 days from Mon 12-28 (through Sun 01-03), so both
- *     CW8 sessions are break resume sessions and yield no progression decision. CW9 starts Tue 01-05 (day 9).
- *     Comeback plan for A in tw 7 (build): A1 4 − 1 = 3 sets × floor(75 × 0.85 = 63.75) = 62.5 kg; A2 3 × floor(57.5 × 0.85
- *     = 48.875) = 47.5; A3 3 − 1 = 2 × floor(55 × 0.85 = 46.75, machine 5) = 45. Bases are the CW4 Sat loads (last eligible A).
+ *     before it: cardio Sat 12-19 (9 days; strength Thu 12-17, 11 days), which meets the short break rule (7..14), but
+ *     comeback.overrides_short_break = true: the comeback keeps the same weights with one set fewer and starts no 85%
+ *     window (rule change; before it, both applied and both CW8 sessions held). So only the comeback session holds;
+ *     Wed 12-30 B (2 days later) is a normal, progression eligible build session.
+ *     Comeback plan for A in tw 7 (build): A1 4 − 1 = 3 sets × 75 kg; A2 3 × 57.5; A3 3 − 1 = 2 × 55. Bases are the CW4 Sat
+ *     loads (last eligible A); the comeback is logged at exactly those loads.
  *   Deload plan (Mon CW5, next = B): B1 ceil(4 × 0.5) = 2 sets × 90 (CW3 base), B2 2 × 40, RIR 3, cardio 30 min easy.
  *   Stall (ENGINE_RULES 3): OHP eligible e1RMs 47.83, 51.25, 54.67 (CW1..3), 56.67 (CW6), then 60, 60, 60, 60 (CW9, CW10,
  *     CW12, CW13; 45 × (1 + (8 + 2) / 30) = 60). After CW12 the last three (CW9, 10, 12) beat the earlier best 56.67 → no
@@ -120,9 +122,9 @@ export const STRENGTH_ROWS: StrengthRow[] = [
   S(6, "mon", "B", 6, "eligible", 2, [4, 4], [95, 42.5]),
   S(6, "thu", "C", 6, "eligible", 2, [3, 3, 3], [115, 22, 52.5]),
   // CW7 · zero week (Christmas): a walk only
-  // CW8 · tw7 build again: comeback + short break, then a break resume session
-  S(8, "mon", "A", 7, "comeback", 2, [3, 3, 2], [62.5, 47.5, 45]),
-  S(8, "wed", "B", 7, "break", 2, [4, 4], [80, 35]),
+  // CW8 · tw7 build again: comeback (same weights, one set fewer; it overrides the short break), then a normal B
+  S(8, "mon", "A", 7, "comeback", 2, [3, 3, 2], [75, 57.5, 55]),
+  S(8, "wed", "B", 7, "eligible", 2, [4, 4], [97.5, 42.5]), // OHP 42.5 × 8 @ 2 = CW6: e1RM 56.67 ties, no new best
   // CW9 · tw8 = build (planned week 8 deload cancelled by the reactive deload)
   S(9, "tue", "C", 8, "eligible", 2, [3, 3, 3], [120, 24, 55]),
   S(9, "thu", "A", 8, "eligible", 2, [4, 4, 3], [80, 60, 60]),
@@ -171,7 +173,7 @@ export const WALK_PARTS: Part[] = [walk(day(7, "thu"), 45)];
 const FLAGS: Record<Kind, SessionFlag[]> = {
   eligible: [],
   deload: ["deload"],
-  comeback: ["comeback", "break_resume"],
+  comeback: ["comeback"],
   break: ["break_resume"],
 };
 
@@ -203,7 +205,7 @@ export const T = {
   afterDeload: at(day(6, "mon"), "07:00"),
   /** Mon CW8 morning: zero week CW7 complete, comeback session next. */
   comebackMorning: at(day(8, "mon"), "07:30"),
-  /** Tue CW9 morning: break window over, training week 8. */
+  /** Tue CW9 morning: training week 8. */
   week8: at(day(9, "tue"), "07:00"),
   /** Sun CW12 evening: OHP flat for 3 exposures, not stalled yet. */
   beforeStall: at(day(12, "sun"), "20:00"),
@@ -218,7 +220,7 @@ export const T = {
 export const IDS = {
   thursdayTrigger: sessionId({ cw: 4, dow: "thu", code: "C" }),
   comeback: sessionId({ cw: 8, dow: "mon", code: "A" }),
-  breakResume: sessionId({ cw: 8, dow: "wed", code: "B" }),
+  afterComeback: sessionId({ cw: 8, dow: "wed", code: "B" }),
   stallSession: sessionId({ cw: 13, dow: "mon", code: "B" }),
 } as const;
 
@@ -239,8 +241,8 @@ export const EXPECTED = {
   streakRepaired: { weeks_without_zero: 13, repairs_used: 1, current_run: 13, best_run: 13 },
   block: { training_week: 12, phase: "consolidate" as PhaseName, extension_weeks: 1, deload_week: 5, reactive_deload_used: true, complete: false },
   totals: { strength_sessions: 31, cardio_sessions: 9, sessions: 40, walking_minutes: 45 },
-  /** Comeback plan for A on Mon CW8: [sets, kg, reps] per prescription. */
-  comeback: { A1: [3, 62.5, 8], A2: [3, 47.5, 8], A3: [2, 45, 12] } as Record<string, [number, number, number]>,
+  /** Comeback plan for A on Mon CW8: [sets, kg, reps] per prescription (same weights, one set fewer). */
+  comeback: { A1: [3, 75, 8], A2: [3, 57.5, 8], A3: [2, 55, 12] } as Record<string, [number, number, number]>,
   /** Deload plan for B on Mon CW5: [sets, kg]. */
   deload: { B1: [2, 90], B2: [2, 40] } as Record<string, [number, number]>,
   /** Logged exercises whose e1RM rises on every eligible exposure: never stalled. */

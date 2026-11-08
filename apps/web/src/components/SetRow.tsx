@@ -184,7 +184,8 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
     );
   }
 
-  const differs = done && (logged.weight !== targetWeight || logged.reps !== set.reps || logged.rir !== set.rir);
+  // A calibration set has no target weight: any picked weight matches it, only reps and RIR can differ.
+  const differs = done && ((targetWeight != null && logged.weight !== targetWeight) || logged.reps !== set.reps || logged.rir !== set.rir);
   const lastLine = last ? `last ${describeShort(last, ex)}` : null;
 
   return (
@@ -228,10 +229,9 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
   );
 }
 
-/** Compact "60 × 8 @ 3" for secondary lines. */
+/** Compact "60 × 8 @ 3" for secondary lines. No weight yet (calibration) reads "8 @ 3". */
 export function describeShort(v: { weight: number | null; reps: number; rir: number | null }, ex: SetRowExercise): string {
   const amount = ex.measure === "seconds" ? `${v.reps} s` : ex.measure === "meters" ? `${v.reps} m` : `${v.reps}${sideSuffix(ex)}`;
-  const load = v.weight == null ? "pick" : fmtLoad(v.weight, { bodyweight: ex.bodyweight, per_hand: ex.per_hand });
-  const head = showsLoad(ex, v.weight) ? `${load} × ${amount}` : amount;
+  const head = v.weight != null && showsLoad(ex, v.weight) ? `${fmtLoad(v.weight, { bodyweight: ex.bodyweight, per_hand: ex.per_hand })} × ${amount}` : amount;
   return `${head}${v.rir != null ? ` @ ${v.rir}` : ""}`;
 }

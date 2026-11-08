@@ -18,15 +18,16 @@ export type SyncEnvelope = z.infer<typeof SyncEnvelope>;
 export async function handleSync(db: D1Database, req: SyncEnvelope): Promise<SyncResponse> {
   const { valid, rejected } = validateTables(req.changes);
 
+  // A cursor ahead of the server's highest rev means the database was restored or reset: treat it as 0 so the client
+  // pulls everything again. Read the rev before this request's own push, which could otherwise lift it past the cursor.
+  const from = req.cursor > (await currentRev(db)) ? 0 : req.cursor;
+
   const stored = await readUpdatedAt(db, idsByTable(valid));
   const winners = lwwWinners(valid, stored);
   // The SQL upsert repeats the LWW check, so a concurrent push between read and write stays correct.
   const { written } = await writeRows(db, { rows: serializeTables(winners), mode: "lww" });
   const accepted = Object.values(written).reduce((a, b) => a + b, 0);
 
-  // A cursor ahead of the server means the database was restored or reset: resend everything.
-  const rev = await currentRev(db);
-  const from = req.cursor > rev ? 0 : req.cursor;
   const pull = await pullSince(db, from, req.limit ?? DEFAULT_PULL_LIMIT);
 
   return {

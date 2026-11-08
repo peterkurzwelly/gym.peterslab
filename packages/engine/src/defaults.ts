@@ -76,7 +76,10 @@ export function loadDefaults(): Defaults {
   return cached;
 }
 
-/** Settings for a fresh install (block starts program.default_start_date, no limitations, start_pct from config). */
+/**
+ * Settings for a fresh install (block starts program.default_start_date, no limitations, start_pct from config).
+ * evening_hour 19 and week_killers work_peaks, travel, evenings are Peter's answers (DECISIONS D17).
+ */
 export function defaultSettings(config: EngineConfig, program: ProgramConfig, nowIso: string): Settings {
   return {
     id: "settings",
@@ -92,6 +95,8 @@ export function defaultSettings(config: EngineConfig, program: ProgramConfig, no
     increment_overrides: {},
     start_pct: config.calibration.start_pct,
     sound: true,
+    evening_hour: 19,
+    week_killers: ["work_peaks", "travel", "evenings"],
     updated_at: nowIso,
     deleted_at: null,
   };

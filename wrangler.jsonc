@@ -16,7 +16,7 @@
     {
       "binding": "DB",
       "database_name": "gym",
-      "database_id": "REPLACE_WITH_D1_ID",
+      "database_id": "e240018c-1945-4305-9c53-98feefa130b5",
       "migrations_dir": "apps/api/migrations"
     }
   ],

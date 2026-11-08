@@ -125,7 +125,7 @@ const alt = (exercise_id: string, name: string, rep_min: number, rep_max: number
   ...extra,
 });
 
-const baseExercise: Omit<PlannedExercise, "prescription_id" | "exercise_id" | "name" | "primary_exercise_id" | "sets" | "reason" | "rule_id" | "decision_id"> = {
+const baseExercise: Omit<PlannedExercise, "prescription_id" | "exercise_id" | "name" | "primary_exercise_id" | "primary_name" | "sets" | "reason" | "rule_id" | "decision_id"> = {
   swapped: null,
   starred: false,
   main_lift: false,
@@ -155,6 +155,7 @@ export const backSquat: PlannedExercise = {
   prescription_id: "A1",
   exercise_id: "back_squat",
   primary_exercise_id: "back_squat",
+  primary_name: "Back squat",
   name: "Back squat",
   starred: true,
   main_lift: true,
@@ -175,6 +176,7 @@ export const benchCalibration: PlannedExercise = {
   prescription_id: "A2",
   exercise_id: "bench_press",
   primary_exercise_id: "bench_press",
+  primary_name: "Bench press",
   name: "Bench press",
   starred: true,
   main_lift: true,
@@ -194,6 +196,7 @@ export const chestSupportedRow: PlannedExercise = {
   prescription_id: "A3",
   exercise_id: "chest_supported_row",
   primary_exercise_id: "chest_supported_row",
+  primary_name: "Chest supported row",
   name: "Chest supported row",
   starred: true,
   rest_s: 150,
@@ -210,6 +213,7 @@ export const plank: PlannedExercise = {
   prescription_id: "A6",
   exercise_id: "plank",
   primary_exercise_id: "plank",
+  primary_name: "Plank",
   name: "Plank",
   measure: "seconds",
   bodyweight: true,
@@ -230,6 +234,7 @@ export const splitSquat: PlannedExercise = {
   prescription_id: "B4",
   exercise_id: "bulgarian_split_squat",
   primary_exercise_id: "bulgarian_split_squat",
+  primary_name: "Bulgarian split squat",
   name: "Bulgarian split squat",
   per_side: true,
   per_hand: true,
@@ -249,6 +254,7 @@ export const pullUp: PlannedExercise = {
   prescription_id: "B3",
   exercise_id: "pull_up",
   primary_exercise_id: "pull_up",
+  primary_name: "Pull-up",
   name: "Pull-up",
   starred: true,
   bodyweight: true,
@@ -271,6 +277,7 @@ export const farmersCarry: PlannedExercise = {
   prescription_id: "C7",
   exercise_id: "farmers_carry",
   primary_exercise_id: "farmers_carry",
+  primary_name: "Farmer's carry",
   name: "Farmer's carry",
   measure: "meters",
   per_hand: true,
@@ -289,6 +296,7 @@ export const bicepsCurl: PlannedExercise = {
   prescription_id: "C5",
   exercise_id: "biceps_curl",
   primary_exercise_id: "biceps_curl",
+  primary_name: "Biceps curl",
   name: "Biceps curl",
   per_hand: true,
   rep_min: 10,
@@ -390,6 +398,9 @@ export const nextB: NextSession = {
   reason: "Next in line after A",
   done_today: false,
   plan: planB,
+  recommended_mode: "full",
+  recommended_rule_id: null,
+  recommended_reason: null,
 };
 
 export const nextDoneToday: NextSession = {

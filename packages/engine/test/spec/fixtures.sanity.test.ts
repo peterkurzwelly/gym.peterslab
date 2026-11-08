@@ -129,7 +129,9 @@ describe("twelve-week fixture matches its derivation", () => {
         seen.set(ex, st);
       });
     const ohp = seen.get("overhead_press")!.eligible.map((x) => Math.round(x * 100) / 100);
-    expect(ohp).toEqual([47.83, 51.25, 54.67, 56.67, 60, 60, 60, 60]);
+    // CW8 B is eligible since the comeback no longer starts a break window (ENGINE_RULES 4.5 rule change): OHP repeats
+    // 42.5 × 8 there (56.67, a tie, not a new best), then 60 from CW9.
+    expect(ohp).toEqual([47.83, 51.25, 54.67, 56.67, 56.67, 60, 60, 60, 60]);
   });
 
   it("reps are always inside the prescription range (no below range, no all-top)", () => {
@@ -156,8 +158,9 @@ describe("twelve-week fixture matches its derivation", () => {
       if (d >= 7) gaps.push({ from: dates[i - 1]!, to: dates[i]!, days: d });
     }
     expect(gaps).toEqual([{ from: "2026-12-19", to: "2026-12-28", days: 9 }]);
-    // Break window: 7 days from Mon 12-28. Both CW8 sessions are inside, the first CW9 session (Tue 01-05) is day 9.
-    expect(rows.filter((r) => r.cw === 8).map((r) => day(r.cw, r.dow))).toEqual(["2026-12-28", "2026-12-30"]);
+    // The 9 day gap ends in the comeback session (Mon 12-28), which overrides the short break (ENGINE_RULES 4.5,
+    // comeback.overrides_short_break): no break window, so Wed 12-30 B is a normal session.
+    expect(rows.filter((r) => r.cw === 8).map((r) => [day(r.cw, r.dow), r.kind])).toEqual([["2026-12-28", "comeback"], ["2026-12-30", "eligible"]]);
     expect(day(9, "tue")).toBe("2027-01-05");
   });
 

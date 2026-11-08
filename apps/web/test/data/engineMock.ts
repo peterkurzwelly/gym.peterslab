@@ -26,6 +26,8 @@ export function makeSettings(now: string): Settings {
     increment_overrides: {},
     start_pct: 0.6,
     sound: true,
+    evening_hour: 19,
+    week_killers: ["work_peaks", "travel", "evenings"],
     updated_at: now,
     deleted_at: null,
   };

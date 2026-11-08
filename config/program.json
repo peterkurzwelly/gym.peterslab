@@ -283,8 +283,7 @@
             }
           ],
           "progression_rule": "double",
-          "superset_group": null,
-          "note": "Program: 2 x 15. Range 12 to 15 so double progression has room."
+          "superset_group": null
         },
         {
           "id": "B6",
@@ -372,7 +371,8 @@
           "rest_s": 150,
           "alternatives": [
             {
-              "exercise_id": "one_arm_dumbbell_row"
+              "exercise_id": "one_arm_dumbbell_row",
+              "per_side": true
             },
             {
               "exercise_id": "machine_row"
@@ -423,7 +423,7 @@
           ],
           "progression_rule": "double",
           "superset_group": "C5",
-          "note": "Superset with triceps pushdown. Program: 2 x 12."
+          "note": "Superset with triceps pushdown."
         },
         {
           "id": "C6",
@@ -444,7 +444,7 @@
           ],
           "progression_rule": "double",
           "superset_group": "C5",
-          "note": "Superset with biceps curl. Program: 2 x 12."
+          "note": "Superset with biceps curl."
         },
         {
           "id": "C7",
@@ -460,7 +460,8 @@
           "rest_s": 75,
           "alternatives": [
             {
-              "exercise_id": "suitcase_carry"
+              "exercise_id": "suitcase_carry",
+              "per_side": true
             }
           ],
           "progression_rule": "double",

@@ -22,6 +22,8 @@ export const fixtures: { [K in SyncTable]: (o?: Partial<RowOf<K>>) => RowOf<K> }
     increment_overrides: { db_press: 2 },
     start_pct: 0.6,
     sound: true,
+    evening_hour: 20,
+    week_killers: ["evenings", "low_energy"],
     ...base,
     ...o,
   }),

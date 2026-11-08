@@ -1,0 +1,78 @@
+/**
+ * Small per-device conveniences for the Today screen. Storage can throw or be empty (private mode,
+ * cleared site data), so every read and write is guarded and the screen works without it.
+ */
+import type { SessionMode } from "@gym/schema";
+
+type Area = "local" | "session";
+
+function area(which: Area): Storage | null {
+  try {
+    return which === "local" ? window.localStorage : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function readJson<T>(which: Area, key: string): T | null {
+  try {
+    const raw = area(which)?.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeJson(which: Area, key: string, value: unknown): void {
+  try {
+    if (value == null) area(which)?.removeItem(key);
+    else area(which)?.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage is a nicety */
+  }
+}
+
+// ---------- check-in skip, remembered for the local date ----------
+
+const SKIP_KEY = "gym.today.checkin-skip";
+
+export function readCheckinSkip(today: string): boolean {
+  return readJson<string>("local", SKIP_KEY) === today;
+}
+
+export function writeCheckinSkip(today: string): void {
+  writeJson("local", SKIP_KEY, today);
+}
+
+// ---------- choices made before the first set (mode, swaps) ----------
+
+export interface PreChoice {
+  date: string;
+  code: string;
+  /** null follows the engine's recommended version. */
+  mode: SessionMode | null;
+  swaps: Record<string, string>;
+}
+
+const PRE_KEY = "gym.today.pre";
+
+export function readPreChoice(date: string, code: string): PreChoice | null {
+  const v = readJson<PreChoice>("session", PRE_KEY);
+  return v && v.date === date && v.code === code ? v : null;
+}
+
+export function writePreChoice(v: PreChoice | null): void {
+  writeJson("session", PRE_KEY, v);
+}
+
+// ---------- last cardio modality ----------
+
+const MODALITY_KEY = "gym.today.cardio-modality";
+
+export function readCardioModality(): string | null {
+  return readJson<string>("local", MODALITY_KEY);
+}
+
+export function writeCardioModality(m: string): void {
+  writeJson("local", MODALITY_KEY, m);
+}

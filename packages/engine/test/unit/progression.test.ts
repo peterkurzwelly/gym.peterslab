@@ -312,12 +312,95 @@ describe("holds: no progression decision", () => {
     const h = new History();
     h.simple("A", day(0), ["A1", "A2"], [[100, 8, 3], [100, 8, 3]]);
     h.checkin(day(2), 2, 2, 2, 1);
-    const s = h.simple("A", day(2), ["A1", "A2"], [[95, 8, 3], [95, 8, 3]]);
+    // The hold comes from the session's own readiness flag (ENGINE_RULES 4.7 rule change), written when it started.
+    const s = h.simple("A", day(2), ["A1", "A2"], [[95, 8, 3], [95, 8, 3]], { flags: ["readiness"] });
     const an = analyze(ctxOf(h, at(day(3))));
     expect([...an.rp.infos.get(s.id)!.readinessCut]).toEqual(["back_squat"]);
     expect(an.rp.tracks.get("back_squat@5-8")!.exposures).toBe(1);
     expect(an.rp.tracks.get("bench_press@5-8")!.exposures).toBe(2);
     expect(an.rp.decisionById.has(`d:event:event.readiness_hold:${s.id}`)).toBe(true);
+  });
+
+  test("readiness: a check-in saved after the session never turns it into a hold", () => {
+    const h = new History();
+    h.simple("A", day(0), ["A1", "A2"], [[100, 8, 3], [100, 8, 3]]);
+    // Session logged at 18:00 without a readiness flag; a low check-in for the same day is saved afterwards.
+    const s = h.simple("A", day(2), ["A1", "A2"], [[100, 8, 3], [100, 8, 3]]);
+    h.checkin(day(2), 1, 1, 1, 1).updated_at = at(day(2), "21:00");
+    const an = analyze(ctxOf(h, at(day(3))));
+    expect(an.rp.infos.get(s.id)!.readinessCut.size).toBe(0);
+    expect(an.rp.tracks.get("back_squat@5-8")!.exposures).toBe(2);
+    expect(an.rp.decisionById.has(`d:event:event.readiness_hold:${s.id}`)).toBe(false);
+  });
+
+  test("readiness: plan flags written into the session drive the hold, check-in or not", () => {
+    const h = new History();
+    h.simple("A", day(0), ["A1", "A2"], [[100, 8, 3], [100, 8, 3]]);
+    h.checkin(day(2), 2, 2, 2, 1);
+    const plan = planSession(ctxOf(h, at(day(2), "17:55")), { code: "A", mode: "full" });
+    expect(plan.flags).toContain("readiness");
+    const s = h.simple("A", day(2), ["A1", "A2"], [[95, 8, 3], [100, 8, 3]], { flags: plan.flags });
+    h.checkins = []; // even if the check-in is deleted later, the session keeps its record
+    const an = analyze(ctxOf(h, at(day(3))));
+    expect([...an.rp.infos.get(s.id)!.readinessCut]).toEqual(["back_squat"]);
+  });
+
+  test("comeback: a cardio session between the zero week and the first strength session does not cancel it", () => {
+    const h = new History();
+    h.simple("A", day(0), ["A2"], [[80, 8, 3], [80, 8, 3]]);
+    // Week 2 (days 7..13) empty: zero. Cardio on day 14 (Mon week 3), strength B on day 15.
+    const cardio = h.cardio(day(14));
+    const back = h.simple("B", day(15), ["B2"], [[40, 10, 3], [40, 10, 3]]);
+    const an = analyze(ctxOf(h, at(day(16))));
+    expect(an.rp.infos.get(cardio.id)!.comeback).toBe(false);
+    expect(an.rp.infos.get(back.id)!.comeback).toBe(true);
+    expect(an.rp.decisionById.has(`d:event:event.comeback_hold:${back.id}`)).toBe(true);
+    expect(an.rp.lastStrengthOrTravel?.id).toBe(back.id);
+  });
+
+  test("comeback: a travel session ends it like a strength session", () => {
+    const h = new History();
+    h.simple("A", day(0), ["A2"], [[80, 8, 3], [80, 8, 3]]);
+    const travel = h.simple("TRAVEL", day(15), ["T1"], [[20, 12, 3]]);
+    const after = h.simple("B", day(17), ["B2"], [[40, 10, 3]]);
+    const an = analyze(ctxOf(h, at(day(18))));
+    expect(an.rp.infos.get(travel.id)!.comeback).toBe(true);
+    expect(an.rp.infos.get(after.id)!.comeback).toBe(false);
+  });
+
+  test("comeback.overrides_short_break: the comeback starts no break window, later sessions progress", () => {
+    const h = new History();
+    h.simple("A", day(4), ["A2"], [[80, 8, 3], [80, 8, 3]]); // Fri week 1
+    // Week 2 empty (zero). Mon week 3 (day 14) = 10 days: short break range and a comeback.
+    const back = h.simple("A", day(14), ["A2"], [[80, 8, 3]]);
+    const next = h.simple("A", day(16), ["A2"], [[80, 8, 3], [80, 8, 3]]);
+    const an = analyze(ctxOf(h, at(day(17))));
+    expect(an.rp.infos.get(back.id)).toMatchObject({ comeback: true, breakResume: false, holdRule: "event.comeback_hold" });
+    expect(an.rp.infos.get(next.id)).toMatchObject({ comeback: false, breakResume: false, holdRule: null });
+    expect(an.rp.decisionById.has(`d:event:event.break_short:${back.id}`)).toBe(false);
+    expect(an.rp.breakWindowEnd).toBeNull();
+    expect(an.rp.tracks.get("bench_press@5-8")!.exposures).toBe(2);
+
+    // Override off: the old behavior, the window runs from the comeback and the next session holds too.
+    const off = analyze(
+      withConfig(ctxOf(h, at(day(17))), (c) => {
+        c.comeback.overrides_short_break = false;
+      }),
+    );
+    expect(off.rp.infos.get(back.id)).toMatchObject({ comeback: true, breakResume: true });
+    expect(off.rp.infos.get(next.id)).toMatchObject({ breakResume: true, holdRule: "event.break_hold" });
+    expect(off.rp.tracks.get("bench_press@5-8")!.exposures).toBe(1);
+  });
+
+  test("comeback after a long break: the long break still applies on top", () => {
+    const h = new History();
+    h.simple("A", day(0), ["A2"], [[80, 8, 3], [80, 8, 3]]);
+    const back = h.simple("A", day(21), ["A2"], [[80, 8, 3]]); // 21 days, weeks 2 and 3 zero
+    const an = analyze(ctxOf(h, at(day(22))));
+    expect(an.rp.infos.get(back.id)).toMatchObject({ comeback: true, longBreakFirst: true, holdRule: "event.comeback_hold" });
+    // Planned that morning (the 18:00 session is not in history yet): fewer sets and 85% loads.
+    const plan = planSession(ctxOf(h, at(day(21), "08:00")), { code: "A", mode: "full" });
+    expect(plan.flags).toEqual(expect.arrayContaining(["comeback", "long_break_restart"]));
   });
 
   test("unfinished sessions never feed progression", () => {

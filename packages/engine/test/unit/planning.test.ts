@@ -133,6 +133,32 @@ describe("phase sets, RIR and modes", () => {
     expect(byPid(a, "A6")).toMatchObject({ measure: "seconds", progression_rule: "reps_only" });
   });
 
+  test("primary_name is the library name of the program default, also when swapped", () => {
+    const ctx = ctxOf(new History(), at(day(0), "08:00"), { block_swaps: { A3: "seated_cable_row" } });
+    const plan = planSession(ctx, { code: "A", mode: "full", swaps: { A1: "hack_squat" } });
+    expect(byPid(plan, "A1")).toMatchObject({ exercise_id: "hack_squat", name: "Hack squat", primary_exercise_id: "back_squat", primary_name: "Back squat", swapped: "session" });
+    expect(byPid(plan, "A3")).toMatchObject({ name: "Seated cable row", primary_name: "Chest supported row", swapped: "block" });
+    expect(byPid(plan, "A2")).toMatchObject({ name: "Bench press", primary_name: "Bench press", swapped: null });
+  });
+
+  test("per_side: an alternative's own per_side wins, else the prescription's", () => {
+    const at0 = at(day(0), "08:00");
+    const c = (swaps: Record<string, string>) => planSession(ctxOf(new History(), at0), { code: "C", mode: "full", swaps });
+    expect(byPid(c({}), "C3").per_side).toBe(false); // seated cable row
+    expect(byPid(c({ C3: "one_arm_dumbbell_row" }), "C3").per_side).toBe(true); // alternative per_side: true
+    expect(byPid(c({ C3: "machine_row" }), "C3").per_side).toBe(false); // alternative without per_side
+    expect(byPid(c({}), "C7").per_side).toBe(false); // farmer's carry
+    expect(byPid(c({ C7: "suitcase_carry" }), "C7").per_side).toBe(true);
+    // B4 is per side; its alternatives inherit it.
+    const b = planSession(ctxOf(new History(), at0), { code: "B", mode: "full", swaps: { B4: "walking_lunge" } });
+    expect(byPid(b, "B4")).toMatchObject({ exercise_id: "walking_lunge", per_side: true });
+    // An alternative can switch it off too.
+    const off = withProgram(ctxOf(new History(), at0), (p) => {
+      p.days.find((d) => d.code === "B")!.prescriptions.find((x) => x.id === "B4")!.alternatives[0]!.per_side = false;
+    });
+    expect(byPid(planSession(off, { code: "B", mode: "full", swaps: { B4: "walking_lunge" } }), "B4").per_side).toBe(false);
+  });
+
   test("rest overrides by exercise id", () => {
     const plan = planSession(ctxOf(new History(), at(day(0), "08:00"), { rest_overrides: { bench_press: 240 } }), { code: "A", mode: "full" });
     expect(byPid(plan, "A2").rest_s).toBe(240);
@@ -144,10 +170,23 @@ describe("comeback, breaks and readiness", () => {
   test("comeback after a zero week: one set less, same weights", () => {
     const h = new History();
     h.simple("A", day(6), ["A1"], [[100, 6, 3], [100, 6, 3]]);
-    // A zero week always means a gap of 8+ days, so the short break applies too (both apply).
-    const both = planSession(ctxOf(h, at(day(14), "08:00")), { code: "A", mode: "full" });
+    // A zero week always means a gap of 8+ days, which meets the short break rule. Since comeback.overrides_short_break
+    // (ENGINE_RULES 4.5 rule change) the comeback keeps the same weights instead of also taking 85%.
+    const plain = planSession(ctxOf(h, at(day(14), "08:00")), { code: "A", mode: "full" });
+    expect(plain.flags).toEqual(["comeback"]);
+    expect(byPid(plain, "A1").sets).toHaveLength(2); // training week 2: 3 sets, minus 1
+    expect(byPid(plain, "A1").sets.map((x) => x.weight)).toEqual([100, 100]);
+    expect(plain.adjustments.map((a) => a.text)).toContain("Coming back is easy on purpose: one set less, same weights.");
+    expect(plain.adjustments.map((a) => a.rule_id)).not.toContain("event.break_short");
+    // Override off: both apply.
+    const both = planSession(
+      withConfig(ctxOf(h, at(day(14), "08:00")), (c) => {
+        c.comeback.overrides_short_break = false;
+      }),
+      { code: "A", mode: "full" },
+    );
     expect(both.flags).toEqual(expect.arrayContaining(["comeback", "break_resume"]));
-    expect(byPid(both, "A1").sets).toHaveLength(2); // training week 2: 3 sets, minus 1
+    expect(byPid(both, "A1").sets).toHaveLength(2);
     expect(byPid(both, "A1").sets[0]!.weight).toBe(85);
     expect(both.adjustments.map((a) => a.text)).toContain("Coming back is easy on purpose: one set less, lighter weights to ease in.");
     // Without break rules the weights stay the same.
@@ -210,6 +249,26 @@ describe("comeback, breaks and readiness", () => {
     expect(byPid(plan, "A1").sets).toHaveLength(1); // 2 − 2 floored at min 1
     expect(byPid(plan, "A1").sets[0]!.weight).toBe(92.5); // 105 × 0.9 = 94.5 → 92.5
     expect(plan.adjustments.find((a) => a.rule_id === "event.readiness")!.text).toBe("Sleep 1/5: Back squat −10%, 2 sets dropped per exercise.");
+  });
+
+  test("readiness: the plan carries the readiness flag for strength and cardio, so the session can store it", () => {
+    const h = new History();
+    h.simple("A", day(0), ["A1"], [[100, 8, 3]]);
+    h.checkin(day(2), 2, 2, 2, 1);
+    const ctx = ctxOf(h, at(day(2), "08:00"));
+    for (const code of ["A", "B", "C", "TRAVEL", "CARDIO"] as const) expect(planSession(ctx, { code, mode: "full" }).flags, code).toContain("readiness");
+    expect(planSession(ctx, { code: "A", mode: "short" }).flags).toContain("readiness");
+  });
+
+  test("a comeback started by hand (mode comeback) also overrides a short break", () => {
+    const h = new History();
+    h.simple("A", day(0), ["A1"], [[100, 6, 3], [100, 6, 3]]);
+    // Day 9 (Wed of week 2): 9 day gap, no zero week (week 1 has a session).
+    const ctx = ctxOf(h, at(day(9), "08:00"));
+    expect(planSession(ctx, { code: "A", mode: "full" }).flags).toEqual(["break_resume"]);
+    const manual = planSession(ctx, { code: "A", mode: "comeback" });
+    expect(manual.flags).toEqual(["comeback"]);
+    expect(byPid(manual, "A1").sets.map((x) => x.weight)).toEqual([100, 100]);
   });
 
   test("readiness above threshold changes nothing", () => {
