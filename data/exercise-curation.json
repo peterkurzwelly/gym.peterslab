@@ -1,0 +1,1192 @@
+{
+  "about": "Curated mapping from free-exercise-db (Unlicense) to the Workout OS exercise library. Read by scripts/build-exercises.mjs. Keys are our exercise ids. source_id null means a custom entry (no good upstream match). Omitted fields fall back to the rules in the build script: increment_kg by equipment, step_kg = increment_kg (5 for lower body barbell and trap bar lifts), per_hand for dumbbell and kettlebell, bodyweight for bodyweight equipment, measure reps, instructions cleaned from the source.",
+  "tag_glossary": {
+    "knee_friendly": "Knee dominant movement with supported, controllable depth (hack squat, leg press, step-up, reverse lunge). Only knee dominant exercises carry it, so the knee_friendly limitation never swaps a hinge for a squat.",
+    "deep_knee_flexion": "Free barbell squat that takes the knee into deep flexion under heavy load (back squat, front squat). Goblet and split squats stay neutral: light load, self-selected depth.",
+    "low_spinal_load": "Little axial or shear load on the spine: supported, seated, lying, machine or light upright work.",
+    "high_spinal_load": "Heavy axial or shear load on the spine: barbell squats, deadlifts, RDLs, good mornings, bent-over rows.",
+    "unilateral": "Each side's working muscles move their own load, so the stronger side cannot take over: single-limb work, and dumbbell, kettlebell or single-handle presses, rows and carries. Isolation and core exercises are not tagged, so the shoulder_symmetry limitation swaps the big pressing and rowing lifts and leaves accessories alone.",
+    "shoulder_friendly": "Pressing or pulling path that is usually easy on the shoulder (landmine press, neutral grip pulldown, face pull, rear delt work).",
+    "overhead": "Arms extended overhead under load (overhead presses, overhead triceps extensions). Pull-ups and pulldowns are not tagged.",
+    "machine": "Machine equipment (added automatically for equipment machine).",
+    "bodyweight": "Bodyweight exercise where logged weight is added load (added automatically when bodyweight is true).",
+    "assisted": "Logged weight is assistance: more weight makes it easier. Progress by reps, not load.",
+    "grip": "Grip is often the limiting factor (carries, deadlifts, hanging work)."
+  },
+  "exercises": {
+    "assisted_pull_up": {
+      "name": "Assisted pull-up (machine)",
+      "source_id": null,
+      "pattern": "v_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["assisted", "low_spinal_load"],
+      "instructions": [
+        "Set the assistance weight, kneel or stand on the platform and take a shoulder width overhand grip.",
+        "Start from straight arms with shoulders pulled down.",
+        "Pull until your chin clears the bar, elbows driving down to your sides.",
+        "Lower under control to straight arms.",
+        "The weight you log is the assistance. Less assistance is harder."
+      ]
+    },
+    "back_extension": {
+      "name": "Back extension",
+      "source_id": "Hyperextensions_Back_Extensions",
+      "pattern": "hinge",
+      "primary_muscles": ["lower_back", "glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "bench",
+      "bodyweight": true,
+      "fatigue_rating": 1,
+      "default_rest_s": 75,
+      "tags": []
+    },
+    "back_squat": {
+      "name": "Back squat",
+      "source_id": "Barbell_Squat",
+      "pattern": "squat",
+      "primary_muscles": ["quads"],
+      "secondary_muscles": ["glutes", "lower_back", "core"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 180,
+      "tags": ["deep_knee_flexion", "high_spinal_load"],
+      "instructions": [
+        "Set the bar in a rack just below shoulder height and place it across your upper back.",
+        "Unrack, step back and stand with feet about shoulder width, toes slightly out.",
+        "Brace your trunk, then sit down between your hips until your thighs are at least parallel.",
+        "Keep knees tracking over your toes and your chest up.",
+        "Drive up through the whole foot to standing."
+      ]
+    },
+    "bench_press": {
+      "name": "Bench press",
+      "source_id": "Barbell_Bench_Press_-_Medium_Grip",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["triceps", "shoulders"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 180,
+      "tags": ["low_spinal_load"],
+      "instructions": [
+        "Lie on the bench with eyes under the bar, feet flat and shoulder blades pulled together.",
+        "Grip the bar a little wider than shoulder width and unrack it over your shoulders.",
+        "Lower the bar under control to the middle of your chest, elbows about 45 degrees from your body.",
+        "Press back up to straight arms. Rack the bar when the set is done."
+      ]
+    },
+    "biceps_curl": {
+      "name": "Dumbbell biceps curl",
+      "source_id": "Dumbbell_Bicep_Curl",
+      "pattern": "isolation",
+      "primary_muscles": ["biceps"],
+      "secondary_muscles": ["forearms"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "bulgarian_split_squat": {
+      "name": "Bulgarian split squat",
+      "source_id": "Split_Squat_with_Dumbbells",
+      "pattern": "lunge",
+      "primary_muscles": ["quads", "glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["unilateral"]
+    },
+    "cable_biceps_curl": {
+      "name": "Cable biceps curl",
+      "source_id": "Standing_Biceps_Cable_Curl",
+      "pattern": "isolation",
+      "primary_muscles": ["biceps"],
+      "secondary_muscles": ["forearms"],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "cable_crunch": {
+      "name": "Cable crunch",
+      "source_id": "Cable_Crunch",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": [],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": [],
+      "instructions": [
+        "Kneel below a high pulley with a rope and hold the rope beside your head.",
+        "Keep your hips still and curl your trunk down, bringing the elbows towards your thighs.",
+        "Squeeze the abs at the bottom, then return slowly."
+      ]
+    },
+    "cable_lateral_raise": {
+      "name": "Cable lateral raise",
+      "source_id": null,
+      "pattern": "isolation",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": [],
+      "equipment": "cable",
+      "per_hand": true,
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"],
+      "instructions": [
+        "Set a single handle at the lowest pulley and stand side on to the stack.",
+        "Take the handle in the far hand, arm slightly bent across the front of your body.",
+        "Raise the arm out to the side until it is level with your shoulder.",
+        "Lower slowly. Finish the reps, then switch sides."
+      ]
+    },
+    "chest_supported_row": {
+      "name": "Chest-supported dumbbell row",
+      "source_id": "Dumbbell_Incline_Row",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "unilateral"]
+    },
+    "conventional_deadlift": {
+      "name": "Conventional deadlift",
+      "source_id": "Barbell_Deadlift",
+      "pattern": "hinge",
+      "primary_muscles": ["glutes", "hamstrings", "lower_back"],
+      "secondary_muscles": ["quads", "traps", "forearms"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 180,
+      "tags": ["grip", "high_spinal_load"],
+      "instructions": [
+        "Stand with the bar over your mid foot, feet about hip width.",
+        "Hinge down and grip the bar just outside your legs.",
+        "Bring shins to the bar, chest up, back flat, and take the slack out of the bar.",
+        "Push the floor away and stand up tall, keeping the bar close to your legs.",
+        "Lower by pushing the hips back, then bend the knees once the bar passes them."
+      ]
+    },
+    "dead_bug": {
+      "name": "Dead bug",
+      "source_id": "Dead_Bug",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": [],
+      "equipment": "bodyweight",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "dumbbell_bench_press": {
+      "name": "Dumbbell bench press",
+      "source_id": "Dumbbell_Bench_Press",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["triceps", "shoulders"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["low_spinal_load", "unilateral"],
+      "instructions": [
+        "Sit on the end of a flat bench with the dumbbells on your thighs, then lie back and bring them to your chest.",
+        "Press the dumbbells up over your chest.",
+        "Lower them under control to the sides of your chest, elbows about 45 degrees from your body.",
+        "Press back up. Log the weight of one dumbbell."
+      ]
+    },
+    "dumbbell_romanian_deadlift": {
+      "name": "Dumbbell Romanian deadlift",
+      "source_id": "Stiff-Legged_Dumbbell_Deadlift",
+      "pattern": "hinge",
+      "primary_muscles": ["hamstrings", "glutes"],
+      "secondary_muscles": ["lower_back"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": [],
+      "instructions": [
+        "Stand tall with a dumbbell in each hand in front of your thighs, knees soft.",
+        "Push your hips back and slide the dumbbells down your legs, back flat.",
+        "Stop when you feel a strong hamstring stretch, usually around mid shin.",
+        "Drive your hips forward to stand tall again."
+      ]
+    },
+    "dumbbell_shoulder_press": {
+      "name": "Standing dumbbell shoulder press",
+      "source_id": "Standing_Dumbbell_Press",
+      "pattern": "v_push",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["triceps"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["overhead", "unilateral"]
+    },
+    "face_pull": {
+      "name": "Face pull",
+      "source_id": "Face_Pull",
+      "pattern": "isolation",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["back", "traps"],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load", "shoulder_friendly"],
+      "instructions": [
+        "Set a rope on a cable at upper chest to face height.",
+        "Grip the rope with thumbs pointing back and step back until the arms are straight.",
+        "Pull the rope towards your face, hands apart, elbows high and out.",
+        "Squeeze the shoulder blades, then return slowly."
+      ]
+    },
+    "farmers_carry": {
+      "name": "Farmer's carry",
+      "source_id": "Farmers_Walk",
+      "pattern": "carry",
+      "primary_muscles": ["forearms", "traps"],
+      "secondary_muscles": ["core"],
+      "equipment": "dumbbell",
+      "measure": "meters",
+      "fatigue_rating": 2,
+      "default_rest_s": 90,
+      "tags": ["grip", "unilateral"],
+      "instructions": [
+        "Pick up a heavy dumbbell in each hand with a flat back, like a deadlift.",
+        "Stand tall, shoulders down and back, trunk braced.",
+        "Walk with short, controlled steps for the set distance.",
+        "Set the weights down with a flat back. Log the weight of one dumbbell."
+      ]
+    },
+    "goblet_squat": {
+      "name": "Goblet squat",
+      "source_id": "Goblet_Squat",
+      "pattern": "squat",
+      "primary_muscles": ["quads"],
+      "secondary_muscles": ["glutes", "core"],
+      "equipment": "dumbbell",
+      "per_hand": false,
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": [],
+      "instructions": [
+        "Hold one dumbbell vertically against your chest, feet about shoulder width.",
+        "Sit down between your hips, chest up and elbows inside the knees.",
+        "Go as deep as you can with a flat back.",
+        "Drive up through the whole foot to standing."
+      ]
+    },
+    "hack_squat": {
+      "name": "Hack squat",
+      "source_id": "Hack_Squat",
+      "pattern": "squat",
+      "primary_muscles": ["quads"],
+      "secondary_muscles": ["glutes"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["knee_friendly"],
+      "instructions": [
+        "Stand on the platform with your back flat on the pad and shoulders under the pads.",
+        "Place feet about shoulder width, toes slightly out, and release the safety handles.",
+        "Lower under control as deep as feels good for your knees, back on the pad.",
+        "Press up through the whole foot without locking the knees. Lock the safeties when done."
+      ]
+    },
+    "hamstring_curl": {
+      "name": "Lying hamstring curl",
+      "source_id": "Lying_Leg_Curls",
+      "pattern": "isolation",
+      "primary_muscles": ["hamstrings"],
+      "secondary_muscles": [],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 75,
+      "tags": ["low_spinal_load"]
+    },
+    "hanging_knee_raise": {
+      "name": "Hanging knee raise",
+      "source_id": null,
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": ["forearms"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["grip", "low_spinal_load"],
+      "instructions": [
+        "Hang from a pull-up bar with straight arms and legs together.",
+        "Curl your knees up towards your chest, rolling the pelvis up at the top.",
+        "Lower slowly without swinging."
+      ]
+    },
+    "incline_dumbbell_press": {
+      "name": "Incline dumbbell press",
+      "source_id": "Incline_Dumbbell_Press",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["shoulders", "triceps"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["low_spinal_load", "unilateral"],
+      "instructions": [
+        "Set the bench to about 30 degrees. Sit with the dumbbells on your thighs, then lie back and bring them to your chest.",
+        "Press the dumbbells up over your upper chest.",
+        "Lower them under control to the sides of your upper chest.",
+        "Press back up. Log the weight of one dumbbell."
+      ]
+    },
+    "incline_machine_press": {
+      "name": "Incline machine press",
+      "source_id": "Leverage_Incline_Chest_Press",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["shoulders", "triceps"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load"]
+    },
+    "lat_pulldown": {
+      "name": "Lat pulldown",
+      "source_id": "Wide-Grip_Lat_Pulldown",
+      "pattern": "v_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "cable",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load"],
+      "instructions": [
+        "Sit with your thighs under the pads and take the bar a little wider than shoulder width.",
+        "Lean back slightly with your chest up.",
+        "Pull the bar to your upper chest, driving the elbows down to your sides.",
+        "Return slowly until your arms are straight."
+      ]
+    },
+    "lateral_raise": {
+      "name": "Dumbbell lateral raise",
+      "source_id": "Side_Lateral_Raise",
+      "pattern": "isolation",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": [],
+      "equipment": "dumbbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "leg_press": {
+      "name": "Leg press",
+      "source_id": "Leg_Press",
+      "pattern": "squat",
+      "primary_muscles": ["quads"],
+      "secondary_muscles": ["glutes"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["knee_friendly", "low_spinal_load"],
+      "instructions": [
+        "Sit with your back and hips flat on the pad, feet shoulder width in the middle of the platform.",
+        "Release the safeties and lower the platform until your knees are at about 90 degrees, hips still on the pad.",
+        "Press back up through the whole foot without locking the knees.",
+        "Lock the safeties when the set is done."
+      ]
+    },
+    "machine_row": {
+      "name": "Machine row",
+      "source_id": "Leverage_Iso_Row",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load"]
+    },
+    "nordic_curl": {
+      "name": "Nordic hamstring curl",
+      "source_id": "Natural_Glute_Ham_Raise",
+      "pattern": "isolation",
+      "primary_muscles": ["hamstrings"],
+      "secondary_muscles": [],
+      "equipment": "bodyweight",
+      "fatigue_rating": 2,
+      "default_rest_s": 90,
+      "tags": []
+    },
+    "one_arm_dumbbell_row": {
+      "name": "One-arm dumbbell row",
+      "source_id": "One-Arm_Dumbbell_Row",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "unilateral"]
+    },
+    "overhead_press": {
+      "name": "Barbell overhead press",
+      "source_id": "Standing_Military_Press",
+      "pattern": "v_push",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["triceps"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 180,
+      "tags": ["overhead"],
+      "instructions": [
+        "Unrack the bar at collarbone height with a grip just wider than shoulder width.",
+        "Stand with feet hip width, glutes and abs tight.",
+        "Press the bar straight up, moving your head back slightly to clear it, then forward under the bar at the top.",
+        "Lower under control to the collarbone. No leg drive."
+      ]
+    },
+    "overhead_triceps_extension": {
+      "name": "Overhead dumbbell triceps extension",
+      "source_id": "Standing_Dumbbell_Triceps_Extension",
+      "pattern": "isolation",
+      "primary_muscles": ["triceps"],
+      "secondary_muscles": [],
+      "equipment": "dumbbell",
+      "per_hand": false,
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["overhead"]
+    },
+    "plank": {
+      "name": "Plank",
+      "source_id": "Plank",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": [],
+      "equipment": "bodyweight",
+      "measure": "seconds",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"],
+      "instructions": [
+        "Forearms on the floor with elbows under the shoulders, legs straight on your toes.",
+        "Squeeze glutes and abs so your body is a straight line from head to heels.",
+        "Hold for the target time, breathing normally."
+      ]
+    },
+    "pull_up": {
+      "name": "Pull-up",
+      "source_id": "Pullups",
+      "pattern": "v_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["grip", "low_spinal_load"],
+      "instructions": [
+        "Hang from the bar with an overhand grip a little wider than shoulder width.",
+        "Pull your shoulders down, then pull until your chin clears the bar.",
+        "Drive the elbows down to your sides and keep the legs still.",
+        "Lower under control to straight arms."
+      ]
+    },
+    "push_up": {
+      "name": "Push-up",
+      "source_id": "Pushups",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["triceps", "shoulders", "core"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 1,
+      "default_rest_s": 90,
+      "tags": ["low_spinal_load"],
+      "instructions": [
+        "Hands on the floor slightly wider than shoulder width, body in a straight line from head to heels.",
+        "Lower until your chest is just above the floor, elbows about 45 degrees from your body.",
+        "Press back up to straight arms without letting the hips sag."
+      ]
+    },
+    "reverse_fly": {
+      "name": "Dumbbell reverse fly",
+      "source_id": "Reverse_Flyes",
+      "pattern": "isolation",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["back", "traps"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load", "shoulder_friendly"]
+    },
+    "romanian_deadlift": {
+      "name": "Romanian deadlift",
+      "source_id": "Romanian_Deadlift",
+      "pattern": "hinge",
+      "primary_muscles": ["hamstrings", "glutes"],
+      "secondary_muscles": ["lower_back", "forearms"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 150,
+      "tags": ["grip", "high_spinal_load"],
+      "instructions": [
+        "Unrack or deadlift the bar to standing with a shoulder width overhand grip.",
+        "With knees soft, push your hips back and slide the bar down your thighs, back flat.",
+        "Stop when you feel a strong hamstring stretch, usually just below the knee.",
+        "Drive your hips forward to stand tall again."
+      ]
+    },
+    "seated_cable_row": {
+      "name": "Seated cable row",
+      "source_id": "Seated_Cable_Rows",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "cable",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load"],
+      "instructions": [
+        "Sit with feet on the platform, knees soft, and take the handle with straight arms.",
+        "Sit tall with your chest up.",
+        "Pull the handle to your lower ribs, squeezing the shoulder blades together.",
+        "Return slowly until your arms are straight, without rounding forward."
+      ]
+    },
+    "seated_dumbbell_press": {
+      "name": "Seated dumbbell shoulder press",
+      "source_id": "Seated_Dumbbell_Press",
+      "pattern": "v_push",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["triceps"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["low_spinal_load", "overhead", "unilateral"]
+    },
+    "split_squat": {
+      "name": "Split squat",
+      "source_id": null,
+      "pattern": "lunge",
+      "primary_muscles": ["quads", "glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["unilateral"],
+      "instructions": [
+        "Hold a dumbbell in each hand and take a long split stance, both feet on the floor.",
+        "Lower straight down until the back knee nearly touches the floor.",
+        "Keep the front knee tracking over the toes and the torso upright.",
+        "Drive up through the front foot. Finish the reps, then switch legs."
+      ]
+    },
+    "step_up": {
+      "name": "Dumbbell step-up",
+      "source_id": "Dumbbell_Step_Ups",
+      "pattern": "lunge",
+      "primary_muscles": ["quads", "glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["knee_friendly", "unilateral"],
+      "instructions": [
+        "Hold a dumbbell in each hand and face a box or bench about knee height.",
+        "Place one whole foot on the box.",
+        "Step up by driving through that foot, without pushing off the back leg.",
+        "Step down under control. Finish the reps, then switch legs."
+      ]
+    },
+    "suitcase_carry": {
+      "name": "Suitcase carry",
+      "source_id": null,
+      "pattern": "carry",
+      "primary_muscles": ["core", "forearms"],
+      "secondary_muscles": ["traps"],
+      "equipment": "dumbbell",
+      "measure": "meters",
+      "fatigue_rating": 1,
+      "default_rest_s": 75,
+      "tags": ["grip", "unilateral"],
+      "instructions": [
+        "Pick up one heavy dumbbell at your side with a flat back.",
+        "Stand tall without leaning towards or away from the weight.",
+        "Walk with short, controlled steps for the set distance.",
+        "Switch hands and repeat."
+      ]
+    },
+    "trap_bar_deadlift": {
+      "name": "Trap bar deadlift",
+      "source_id": "Trap_Bar_Deadlift",
+      "pattern": "hinge",
+      "primary_muscles": ["glutes", "hamstrings"],
+      "secondary_muscles": ["quads", "lower_back", "traps", "forearms"],
+      "equipment": "trap_bar",
+      "fatigue_rating": 3,
+      "default_rest_s": 180,
+      "tags": ["grip", "high_spinal_load"]
+    },
+    "triceps_pushdown": {
+      "name": "Triceps pushdown",
+      "source_id": "Triceps_Pushdown",
+      "pattern": "isolation",
+      "primary_muscles": ["triceps"],
+      "secondary_muscles": [],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "walking_lunge": {
+      "name": "Walking lunge",
+      "source_id": "Bodyweight_Walking_Lunge",
+      "pattern": "lunge",
+      "primary_muscles": ["quads", "glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["unilateral"],
+      "instructions": [
+        "Hold a dumbbell in each hand at your sides.",
+        "Step forward and lower until the back knee nearly touches the floor.",
+        "Keep the torso upright and the front knee over the foot.",
+        "Drive through the front foot and step straight into the next lunge with the other leg."
+      ]
+    },
+
+    "ab_wheel": {
+      "name": "Ab wheel rollout",
+      "source_id": "Ab_Roller",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": [],
+      "equipment": "other",
+      "bodyweight": true,
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": []
+    },
+    "arnold_press": {
+      "name": "Arnold press",
+      "source_id": "Arnold_Dumbbell_Press",
+      "pattern": "v_push",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["triceps"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "overhead", "unilateral"]
+    },
+    "barbell_row": {
+      "name": "Barbell row",
+      "source_id": "Bent_Over_Barbell_Row",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps", "lower_back"],
+      "equipment": "barbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["high_spinal_load"]
+    },
+    "cable_fly": {
+      "name": "Cable fly",
+      "source_id": "Cable_Crossover",
+      "pattern": "isolation",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["shoulders"],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "cable_overhead_triceps_extension": {
+      "name": "Cable overhead triceps extension",
+      "source_id": "Cable_Rope_Overhead_Triceps_Extension",
+      "pattern": "isolation",
+      "primary_muscles": ["triceps"],
+      "secondary_muscles": [],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["overhead"]
+    },
+    "cable_row_single_arm": {
+      "name": "Single-arm cable row",
+      "source_id": "Seated_One-arm_Cable_Pulley_Rows",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "cable",
+      "per_hand": true,
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "unilateral"]
+    },
+    "chest_supported_t_bar_row": {
+      "name": "Chest-supported T-bar row",
+      "source_id": "Lying_T-Bar_Row",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load"]
+    },
+    "chin_up": {
+      "name": "Chin-up",
+      "source_id": "Chin-Up",
+      "pattern": "v_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps", "forearms"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": ["grip", "low_spinal_load"]
+    },
+    "dips": {
+      "name": "Dip",
+      "source_id": "Parallel_Bar_Dip",
+      "pattern": "h_push",
+      "primary_muscles": ["chest", "triceps"],
+      "secondary_muscles": ["shoulders"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": []
+    },
+    "dumbbell_fly": {
+      "name": "Dumbbell fly",
+      "source_id": "Dumbbell_Flyes",
+      "pattern": "isolation",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["shoulders"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "dumbbell_shrug": {
+      "name": "Dumbbell shrug",
+      "source_id": "Dumbbell_Shrug",
+      "pattern": "isolation",
+      "primary_muscles": ["traps"],
+      "secondary_muscles": ["forearms"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["grip"]
+    },
+    "ez_bar_curl": {
+      "name": "EZ-bar curl",
+      "source_id": "EZ-Bar_Curl",
+      "pattern": "isolation",
+      "primary_muscles": ["biceps"],
+      "secondary_muscles": ["forearms"],
+      "equipment": "barbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "front_squat": {
+      "name": "Front squat",
+      "source_id": "Front_Barbell_Squat",
+      "pattern": "squat",
+      "primary_muscles": ["quads"],
+      "secondary_muscles": ["glutes", "core"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 180,
+      "tags": ["deep_knee_flexion", "high_spinal_load"]
+    },
+    "glute_bridge": {
+      "name": "Glute bridge",
+      "source_id": "Butt_Lift_Bridge",
+      "pattern": "hinge",
+      "primary_muscles": ["glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "good_morning": {
+      "name": "Good morning",
+      "source_id": "Good_Morning",
+      "pattern": "hinge",
+      "primary_muscles": ["hamstrings", "glutes"],
+      "secondary_muscles": ["lower_back"],
+      "equipment": "barbell",
+      "step_kg": 2.5,
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["high_spinal_load"]
+    },
+    "hammer_curl": {
+      "name": "Hammer curl",
+      "source_id": "Hammer_Curls",
+      "pattern": "isolation",
+      "primary_muscles": ["biceps"],
+      "secondary_muscles": ["forearms"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "hanging_leg_raise": {
+      "name": "Hanging leg raise",
+      "source_id": "Hanging_Leg_Raise",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": ["forearms"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["grip", "low_spinal_load"]
+    },
+    "hip_thrust": {
+      "name": "Barbell hip thrust",
+      "source_id": "Barbell_Hip_Thrust",
+      "pattern": "hinge",
+      "primary_muscles": ["glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "barbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load"]
+    },
+    "incline_bench_press": {
+      "name": "Incline bench press",
+      "source_id": "Barbell_Incline_Bench_Press_-_Medium_Grip",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["shoulders", "triceps"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 150,
+      "tags": ["low_spinal_load"]
+    },
+    "incline_dumbbell_curl": {
+      "name": "Incline dumbbell curl",
+      "source_id": "Incline_Dumbbell_Curl",
+      "pattern": "isolation",
+      "primary_muscles": ["biceps"],
+      "secondary_muscles": [],
+      "equipment": "dumbbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "inverted_row": {
+      "name": "Inverted row",
+      "source_id": "Inverted_Row",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "bodyweight",
+      "fatigue_rating": 1,
+      "default_rest_s": 90,
+      "tags": ["low_spinal_load"]
+    },
+    "kettlebell_swing": {
+      "name": "Kettlebell swing",
+      "source_id": "One-Arm_Kettlebell_Swings",
+      "pattern": "hinge",
+      "primary_muscles": ["glutes", "hamstrings"],
+      "secondary_muscles": ["lower_back", "core"],
+      "equipment": "kettlebell",
+      "per_hand": false,
+      "fatigue_rating": 2,
+      "default_rest_s": 90,
+      "tags": [],
+      "instructions": [
+        "Stand with the kettlebell a foot in front of you, feet a little wider than shoulder width.",
+        "Hinge, grip the handle with both hands and hike it back between your legs.",
+        "Snap your hips forward to swing the bell to chest height with straight arms.",
+        "Let it fall back between your legs and hinge into the next rep."
+      ]
+    },
+    "landmine_press": {
+      "name": "Landmine press",
+      "source_id": null,
+      "pattern": "v_push",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["chest", "triceps"],
+      "equipment": "barbell",
+      "per_hand": true,
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["shoulder_friendly", "unilateral"],
+      "instructions": [
+        "Wedge one end of a barbell in a landmine or corner and load the other end.",
+        "Stand or half kneel and hold the loaded end at shoulder height in one hand.",
+        "Press up and forward along the bar's arc until the arm is straight.",
+        "Lower under control. Finish the reps, then switch sides. Log the plates on the bar."
+      ]
+    },
+    "leg_extension": {
+      "name": "Leg extension",
+      "source_id": "Leg_Extensions",
+      "pattern": "isolation",
+      "primary_muscles": ["quads"],
+      "secondary_muscles": [],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 75,
+      "tags": ["low_spinal_load"]
+    },
+    "machine_chest_press": {
+      "name": "Machine chest press",
+      "source_id": "Leverage_Chest_Press",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["triceps", "shoulders"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load"]
+    },
+    "machine_crunch": {
+      "name": "Machine crunch",
+      "source_id": "Ab_Crunch_Machine",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": [],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": []
+    },
+    "machine_shoulder_press": {
+      "name": "Machine shoulder press",
+      "source_id": "Machine_Shoulder_Military_Press",
+      "pattern": "v_push",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["triceps"],
+      "equipment": "machine",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "overhead"]
+    },
+    "neutral_grip_pulldown": {
+      "name": "Neutral grip pulldown",
+      "source_id": "V-Bar_Pulldown",
+      "pattern": "v_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "cable",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "shoulder_friendly"]
+    },
+    "pallof_press": {
+      "name": "Pallof press",
+      "source_id": "Pallof_Press",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": [],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "pec_deck": {
+      "name": "Pec deck",
+      "source_id": "Butterfly",
+      "pattern": "isolation",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["shoulders"],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "rear_delt_machine": {
+      "name": "Rear delt machine",
+      "source_id": "Reverse_Machine_Flyes",
+      "pattern": "isolation",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["back", "traps"],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load", "shoulder_friendly"]
+    },
+    "reverse_lunge": {
+      "name": "Reverse lunge",
+      "source_id": "Dumbbell_Rear_Lunge",
+      "pattern": "lunge",
+      "primary_muscles": ["quads", "glutes"],
+      "secondary_muscles": ["hamstrings"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["knee_friendly", "unilateral"]
+    },
+    "seated_calf_raise": {
+      "name": "Seated calf raise",
+      "source_id": "Seated_Calf_Raise",
+      "pattern": "isolation",
+      "primary_muscles": ["calves"],
+      "secondary_muscles": [],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "seated_leg_curl": {
+      "name": "Seated hamstring curl",
+      "source_id": "Seated_Leg_Curl",
+      "pattern": "isolation",
+      "primary_muscles": ["hamstrings"],
+      "secondary_muscles": [],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 75,
+      "tags": ["low_spinal_load"]
+    },
+    "side_plank": {
+      "name": "Side plank",
+      "source_id": "Side_Bridge",
+      "pattern": "core",
+      "primary_muscles": ["core"],
+      "secondary_muscles": [],
+      "equipment": "bodyweight",
+      "measure": "seconds",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"],
+      "instructions": [
+        "Lie on your side with your elbow under your shoulder and legs stacked.",
+        "Lift your hips so your body forms a straight line from head to feet.",
+        "Hold, breathing normally, then switch sides."
+      ]
+    },
+    "single_arm_dumbbell_bench_press": {
+      "name": "Single-arm dumbbell bench press",
+      "source_id": "One_Arm_Dumbbell_Bench_Press",
+      "pattern": "h_push",
+      "primary_muscles": ["chest"],
+      "secondary_muscles": ["triceps", "shoulders", "core"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "unilateral"]
+    },
+    "single_arm_dumbbell_shoulder_press": {
+      "name": "Single-arm dumbbell shoulder press",
+      "source_id": "Dumbbell_One-Arm_Shoulder_Press",
+      "pattern": "v_push",
+      "primary_muscles": ["shoulders"],
+      "secondary_muscles": ["triceps", "core"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["overhead", "unilateral"]
+    },
+    "single_arm_pulldown": {
+      "name": "Single-arm pulldown",
+      "source_id": "One_Arm_Lat_Pulldown",
+      "pattern": "v_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps"],
+      "equipment": "cable",
+      "per_hand": true,
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["low_spinal_load", "unilateral"]
+    },
+    "single_leg_rdl": {
+      "name": "Single-leg Romanian deadlift",
+      "source_id": "Kettlebell_One-Legged_Deadlift",
+      "pattern": "hinge",
+      "primary_muscles": ["hamstrings", "glutes"],
+      "secondary_muscles": ["core"],
+      "equipment": "dumbbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 90,
+      "tags": ["unilateral"],
+      "instructions": [
+        "Hold a dumbbell in the hand opposite your standing leg, knee soft.",
+        "Hinge at the hip and reach the free leg straight back, hips square to the floor.",
+        "Lower until your torso is close to parallel or you feel a strong hamstring stretch.",
+        "Drive the hip forward to stand. Finish the reps, then switch legs."
+      ]
+    },
+    "skull_crusher": {
+      "name": "EZ-bar skull crusher",
+      "source_id": "EZ-Bar_Skullcrusher",
+      "pattern": "isolation",
+      "primary_muscles": ["triceps"],
+      "secondary_muscles": [],
+      "equipment": "barbell",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "smith_machine_squat": {
+      "name": "Smith machine squat",
+      "source_id": "Smith_Machine_Squat",
+      "pattern": "squat",
+      "primary_muscles": ["quads"],
+      "secondary_muscles": ["glutes"],
+      "equipment": "machine",
+      "increment_kg": 2.5,
+      "step_kg": 5,
+      "fatigue_rating": 2,
+      "default_rest_s": 150,
+      "tags": []
+    },
+    "standing_calf_raise": {
+      "name": "Standing calf raise",
+      "source_id": "Standing_Calf_Raises",
+      "pattern": "isolation",
+      "primary_muscles": ["calves"],
+      "secondary_muscles": [],
+      "equipment": "machine",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": []
+    },
+    "straight_arm_pulldown": {
+      "name": "Straight-arm pulldown",
+      "source_id": "Straight-Arm_Pulldown",
+      "pattern": "isolation",
+      "primary_muscles": ["back"],
+      "secondary_muscles": [],
+      "equipment": "cable",
+      "fatigue_rating": 1,
+      "default_rest_s": 60,
+      "tags": ["low_spinal_load"]
+    },
+    "sumo_deadlift": {
+      "name": "Sumo deadlift",
+      "source_id": "Sumo_Deadlift",
+      "pattern": "hinge",
+      "primary_muscles": ["glutes", "hamstrings"],
+      "secondary_muscles": ["quads", "lower_back", "traps", "forearms"],
+      "equipment": "barbell",
+      "fatigue_rating": 3,
+      "default_rest_s": 180,
+      "tags": ["grip", "high_spinal_load"]
+    },
+    "t_bar_row": {
+      "name": "T-bar row",
+      "source_id": "T-Bar_Row_with_Handle",
+      "pattern": "h_pull",
+      "primary_muscles": ["back"],
+      "secondary_muscles": ["biceps", "lower_back"],
+      "equipment": "barbell",
+      "fatigue_rating": 2,
+      "default_rest_s": 120,
+      "tags": ["high_spinal_load"]
+    }
+  }
+}

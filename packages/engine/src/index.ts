@@ -5,55 +5,55 @@
  * CONTRACT: the function signatures below are what the web app and tests code against.
  * Implementations live in sibling modules and are re-exported here.
  */
-import type { CardioPlan, EngineContext, EngineState, PlanOptions, SessionPlan, SessionSummary, SpacingWarning } from "./types";
-import type { DayCode, EngineConfig, Exercise, ProgramConfig, Settings } from "@gym/schema";
+import type { CardioPlan, EngineContext, PlanOptions, SessionPlan, SessionSummary, SpacingWarning } from "./types";
+import type { DayCode } from "@gym/schema";
+import { analyze } from "./analysis";
+import { buildCardio } from "./cardio";
+import { spacing } from "./events";
+import { buildPlan } from "./planning";
+import { summarize } from "./summary";
 
 export * from "./types";
 
-/** Engine version string, read from config/engine.json (engine_version). */
-export declare const ENGINE_VERSION: string;
+// ENGINE_VERSION: engine version string, read from config/engine.json (engine_version).
+// loadDefaults(): parse and validate the bundled config/engine.json, config/program.json and data/exercises.json.
+//   Throws with a readable message when a file fails validation.
+// defaultSettings(config, program, nowIso): settings for a fresh install.
+export { ENGINE_VERSION, loadDefaults, defaultSettings } from "./defaults";
 
-/**
- * Parse and validate the bundled config/engine.json, config/program.json and data/exercises.json.
- * Throws with a readable message when a file fails validation.
- */
-export declare function loadDefaults(): {
-  config: EngineConfig;
-  program: ProgramConfig;
-  exercises: Record<string, Exercise>;
-};
-
-/** Settings for a fresh install (block starts program.default_start_date, no limitations, start_pct from config). */
-export declare function defaultSettings(config: EngineConfig, program: ProgramConfig, nowIso: string): Settings;
-
-/** Everything the UI needs in one call. Pure and deterministic. */
-export declare function computeState(ctx: EngineContext): EngineState;
+// computeState(ctx): everything the UI needs in one call. Pure and deterministic.
+export { computeState } from "./state";
 
 /** Plan a session (any day code and mode) as of opts.at ?? ctx.now. */
-export declare function planSession(ctx: EngineContext, opts: PlanOptions): SessionPlan;
+export function planSession(ctx: EngineContext, opts: PlanOptions): SessionPlan {
+  return buildPlan(analyze(ctx, { at: opts.at, excludeSessionId: opts.sessionId }), opts);
+}
 
 /** Cardio plan for the current training week, with readiness swap and spacing warnings applied. */
-export declare function planCardio(ctx: EngineContext, opts?: { at?: string }): CardioPlan;
+export function planCardio(ctx: EngineContext, opts?: { at?: string }): CardioPlan {
+  return buildCardio(analyze(ctx, { at: opts?.at })).plan;
+}
 
-/** Warnings (never blocks) for starting a session of this kind at opts.at ?? ctx.now. */
-export declare function spacingWarnings(ctx: EngineContext, code: DayCode, opts?: { at?: string; intensity?: "easy" | "hard" }): SpacingWarning[];
+/**
+ * Warnings (never blocks) for starting a session of this kind at opts.at ?? ctx.now.
+ * Cardio intensity defaults to today's cardio plan (intervals are hard; deload, readiness swap and bonus are easy).
+ */
+export function spacingWarnings(ctx: EngineContext, code: DayCode, opts?: { at?: string; intensity?: "easy" | "hard" }): SpacingWarning[] {
+  const an = analyze(ctx, { at: opts?.at });
+  const intensity = opts?.intensity ?? (code === "CARDIO" && buildCardio(an).plan.kind === "easy" ? "easy" : "hard");
+  return spacing(an, code, intensity);
+}
 
 /** What changed for next time and why, for a finished session (ctx.history must include it). */
-export declare function summarizeSession(ctx: EngineContext, sessionId: string): SessionSummary;
+export function summarizeSession(ctx: EngineContext, sessionId: string): SessionSummary {
+  return summarize(analyze(ctx, { forceFinishedId: sessionId }), sessionId);
+}
 
 // ---- calculations (exported for UI and tests) ----
+// e1rm(weight, reps, rir, divisor?): Epley with RIR, weight × (1 + (reps + rir) / divisor). rir null counts as 0.
+// roundToIncrement(value, increment, mode?): nearest multiple of increment, or down / up. 2 decimals, no float noise.
+export { e1rm, roundToIncrement } from "./calc";
 
-/** Epley with RIR: weight × (1 + (reps + rir) / divisor). rir null counts as 0. */
-export declare function e1rm(weight: number, reps: number, rir: number | null, divisor?: number): number;
-
-/** Round to the nearest multiple of increment (mode "nearest"), or down / up. Avoids float noise (2 decimals). */
-export declare function roundToIncrement(value: number, increment: number, mode?: "nearest" | "down" | "up"): number;
-
-/** Local calendar date "YYYY-MM-DD" of an ISO instant in an IANA timezone. */
-export declare function localDate(iso: string, timeZone: string): string;
-
-/** Monday ("YYYY-MM-DD") of the week containing a local date. */
-export declare function weekStart(date: string): string;
-
-/** Whole days between two local dates (b − a). */
-export declare function daysBetween(a: string, b: string): number;
+// localDate(iso, tz): local calendar date "YYYY-MM-DD" of an instant. weekStart(date): its Monday.
+// daysBetween(a, b): whole days b − a.
+export { localDate, weekStart, daysBetween } from "./dates";

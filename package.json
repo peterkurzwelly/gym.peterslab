@@ -14,7 +14,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "deploy": "npm run build && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "data:build": "node scripts/build-exercises.mjs",
+    "data:validate": "node scripts/validate-data.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261108.1",

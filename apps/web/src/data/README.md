@@ -1,0 +1,141 @@
+# src/data · offline-first data layer
+
+Dexie (IndexedDB) is the source of truth on the phone. Every write goes to Dexie first, through `repo.ts`, and is queued in an outbox. Sync with `POST /api/sync` happens in the background. **Logging never waits for the network.**
+
+Import everything from `../data` (the barrel `index.ts`).
+
+| File | What |
+|---|---|
+| `db.ts` | Dexie database `workout-os`: one table per synced row type + `outbox` + `meta` |
+| `repo.ts` | The only write path. One transaction per mutation, `updated_at` strictly increasing per row, outbox queued |
+| `context.ts` | Builds `EngineContext` from Dexie (`loadContext`, `buildContext`) |
+| `hooks.ts` | `useEngine`, `usePlan`, `useSessionSummary`, `useCardioPlan`, plus live reads |
+| `sync.ts` | `syncClient` singleton, `useSyncStatus` |
+| `backup.ts` | Export / import, local file and server |
+| `storage.ts` | `navigator.storage.persist()` and usage estimate |
+| `boot.ts` | `bootData()`: one call at app start |
+| `clock.ts` | `nowIso()` (injectable in tests with `setClock`) |
+
+## Boot
+
+```tsx
+// main.tsx or App.tsx, once
+useEffect(() => bootData(), []); // persistent storage + settings row + background sync; returns stop()
+```
+
+## Cold open → next session
+
+```tsx
+const { ready, state, error } = useEngine();
+if (!ready) return null;              // first paint is a few ms: Dexie only, no network
+if (error || !state) return <Calm text="Could not plan today. Your log is safe." />;
+const next = state.next;              // NextSession
+next.plan.exercises[0];               // PlannedExercise with sets, reason, decision_id
+state.current_week;                   // WeekState for the week card
+state.active;                         // { session, plan } when a session is in progress
+```
+
+`useEngine` recomputes on every write (local or synced), every 30 s and when the app becomes visible. Engine errors come back as `error`; nothing throws into render. Several components can call it: identical data shares one `computeState`.
+
+## Log the first set (≤ 2 taps)
+
+```ts
+// Tap 1: start (or resume state.active.session)
+const session = await startSession({ code: next.code, mode: "full" }); // mode: full | short | travel | comeback
+// Tap 2: confirm the prefilled set
+const ex = next.plan.exercises[0];
+const target = ex.sets[0];
+await logSet({
+  sessionId: session.id,
+  prescriptionId: ex.prescription_id,
+  exerciseId: ex.exercise_id,
+  setIndex: target.index,
+  target: { weight: target.weight, reps: target.reps, rir: target.rir },
+  weight: target.weight ?? 0, reps: target.reps, rir: target.rir,
+  isTopSet: target.kind === "top",
+});
+```
+
+- While logging, plan with the session id so targets stay frozen: `usePlan({ code, mode, swaps: session.swaps, sessionId: session.id })`.
+- Logged sets live: `useSessionLogs(session.id)` → `{ session, sets, cardio }`.
+- Logging the same slot (session, prescription, exercise, set index) again updates that set, so a double tap never duplicates.
+- Edit / remove: `updateSet(id, { weight, reps, rir, painFlag, isTopSet })`, `deleteSet(id)` (soft delete).
+- Pain: `setPain(sessionId, exerciseId, true)` flags every logged set of that exercise in the session.
+- Swap for this session: `swapExercise(sessionId, prescriptionId, exerciseId)` (null removes it). Swap for the block: `updateSettings({ block_swaps: { ...settings.block_swaps, B3: "lat_pulldown" } })`.
+
+## Finish a session
+
+```ts
+const { error } = await finishSession(session.id); // sets ended_at, stores the engine's decisions, syncs
+navigate(`/summary/${session.id}`);
+// Summary screen
+const { ready, summary, error } = useSessionSummary(id); // SessionSummary: changes, prs, week
+```
+
+`finishSession` never fails because of the engine: the session is finished first, `error` tells you if decisions could not be stored. `discardSession(id)` soft deletes the session with its sets, cardio logs and decisions. Sessions left open are auto finished by the engine; `useEngine` stores their `ended_at` once.
+
+## Check-in
+
+```ts
+await saveCheckin({ date: state.today, sleep: 4, soreness: 3, stress: 4, energy: 5 }); // 1..5, higher is better
+const checkin = useCheckin(state.today); // live, null when none
+```
+
+One row per local date (`ck_YYYY-MM-DD`), saving again overwrites it. `state.readiness` reflects it on the next render.
+
+## Cardio and walks
+
+```ts
+const { plan } = useCardioPlan();                 // CardioPlan (segments, counts_as, warnings)
+const s = await startCardioSession();
+await logCardio({ sessionId: s.id, modality: "bike", minutes: plan.total_min,
+  hardMinutes: plan.hard_minutes, intensity: plan.kind === "intervals" ? "hard" : "easy", avgHr: null, source: "timer" });
+await finishSession(s.id);
+await logWalk(state.today, 30);                   // walking minutes only, never a session
+```
+
+`logCardio` defaults `date` to today in `settings.timezone`.
+
+## Weeks, settings, exercises
+
+```ts
+await repairWeek(week.id);                          // only when week.can_repair; repairWeek(id, false) undoes
+await updateSettings({ interval_modality: "rower" });
+const settings = useSettings();                     // live row
+await saveCustomExercise({ name: "Sled push", pattern: "carry", primary_muscles: ["quads"],
+  secondary_muscles: [], equipment: "other", fatigue_rating: 2, increment_kg: 5, step_kg: 5,
+  default_rest_s: 120, tags: [] });
+```
+
+## Sync status
+
+```tsx
+const { state, pending, lastSyncAt, lastError } = useSyncStatus();
+// state: idle | syncing | offline | auth_required | error
+await syncNow();                 // "Sync now" button; never throws
+await setSyncKey(pastedKey);     // Settings: stored on this device only, sent as Authorization: Bearer
+```
+
+- `auth_required`: no or wrong sync key (401/403), or an expired Cloudflare Access session (redirect). Show "Add your sync key in Settings" (`lastError` has the text).
+- `offline`: rows wait in the outbox; nothing is lost. Show it quietly, never as a failure.
+- Triggers: start, back online, app visible / hidden (flush with keepalive), 2 s after writes, every 60 s while visible, after `finishSession`. `error` (5xx) retries with backoff.
+
+## Export / import
+
+```ts
+await downloadExport();                         // iPhone: share sheet (Save to Files); elsewhere a download
+const file = await readExportFile(input.files[0]); // validates, throws ImportError with a readable message
+await importLocal(file, "merge");               // last write wins per row
+await importLocal(file, "replace");             // local rows not in the file are soft deleted; file rows win
+const remote = await fetchRemoteExport();       // GET /api/export (throws ApiError: auth_required | offline | error)
+await pushRemoteImport(file, "merge");          // POST /api/import?mode=merge|replace, then syncs
+const { usage, quota, persisted } = await storageEstimate();
+```
+
+Everything imported is queued for sync.
+
+## Rules for UI code
+
+- Never write to `db` directly. Use `repo` functions only (they validate, bump `updated_at` and queue the outbox).
+- Never compute targets. Render `state` / `plan` and show each target's `reason`.
+- Await writes only for navigation; the UI updates from live queries anyway.

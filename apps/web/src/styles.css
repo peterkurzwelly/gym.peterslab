@@ -49,3 +49,70 @@
     font-size: 16px; /* prevents iOS zoom on focus */
   }
 }
+
+/* components */
+/* UI kit styles that utilities cannot express. Motion stays at or under 150 ms. */
+@layer components {
+  /* Press feedback for tap targets. */
+  .gym-press:active {
+    transform: scale(0.97);
+  }
+
+  /* Default header title hides as soon as a screen portals its own <ShellTitle>. */
+  .shell-title > .shell-title-default:not(:only-child) {
+    display: none;
+  }
+
+  /* Rest timer alert. */
+  .gym-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    background: var(--color-orange);
+    opacity: 0.38;
+    transition: opacity 150ms ease-out;
+  }
+
+  .gym-pulse {
+    animation: gym-pulse 1.2s ease-in-out infinite;
+  }
+
+  .gym-skeleton {
+    background: linear-gradient(90deg, var(--color-ink-3) 0%, var(--color-line) 50%, var(--color-ink-3) 100%);
+    background-size: 200% 100%;
+    animation: gym-shimmer 1.4s linear infinite;
+  }
+}
+
+@keyframes gym-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes gym-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gym-press:active {
+    transform: none;
+  }
+  .gym-pulse,
+  .gym-skeleton {
+    animation: none;
+  }
+  .gym-flash {
+    transition: none;
+  }
+}
