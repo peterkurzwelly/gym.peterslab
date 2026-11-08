@@ -94,3 +94,17 @@ export function PlanHeading({ plan }: { plan: SessionPlan }) {
     </div>
   );
 }
+
+/** One quiet line in the dock before the first set: the check-in card is below the fold. */
+export function CheckinPrompt({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="gym-press flex min-h-11 w-full items-center justify-between gap-3 rounded-[4px] border border-line bg-ink-2 px-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.45)] active:bg-ink-3"
+    >
+      <span className="text-[13px] text-paper-dim">Not checked in today</span>
+      <span className="text-[12px] uppercase tracking-[0.12em] text-paper">Check in · 20 s</span>
+    </button>
+  );
+}

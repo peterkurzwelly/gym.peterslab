@@ -28,14 +28,51 @@ async function added(fn: () => Promise<unknown>): Promise<string[]> {
 describe("repo writes", () => {
   it("updateSettings on a fresh database creates the row and applies the patch in one transaction", async () => {
     // Regression: with a plain arrow as the transaction scope this threw PrematureCommitError.
+    setClock(() => T0);
     const s = await repo.updateSettings({ sound: false });
     expect(s.sound).toBe(false);
+    expect(s.updated_at).toBe(T0);
     expect((await db.settings.get("settings"))?.sound).toBe(false);
-    expect(await outboxKeys()).toEqual(["settings/settings", "settings/settings"]);
+    // Only the edit is queued; the seed it was built on is local.
+    expect(await outboxKeys()).toEqual(["settings/settings"]);
+  });
+
+  it("ensureSettings seeds the defaults locally, dated 1970 and not queued, so they never beat the real row", async () => {
+    setClock(() => T0);
+    const seed = await repo.ensureSettings();
+    expect(seed.updated_at).toBe(repo.SETTINGS_SEED_AT);
+    expect(await db.outbox.count()).toBe(0);
+    // The first real edit is stamped now and queued.
+    const edited = await repo.updateSettings({ interval_modality: "rower" });
+    expect(edited.updated_at).toBe(T0);
+    expect(await outboxKeys()).toEqual(["settings/settings"]);
+  });
+
+  it("ensureSettings brings back a soft-deleted row as a queued write", async () => {
+    setClock(() => T0);
+    await repo.ensureSettings();
+    await db.settings.update("settings", { deleted_at: T0, updated_at: T0 });
+    setClock(() => "2026-11-08T11:00:00.000Z");
+    const back = await repo.ensureSettings();
+    expect(back.deleted_at).toBeNull();
+    expect(back.updated_at).toBe("2026-11-08T11:00:00.000Z");
+    expect(await outboxKeys()).toEqual(["settings/settings"]);
+  });
+
+  it("a rewrite keeps fields this version does not know (written by a newer app)", async () => {
+    await repo.ensureSettings();
+    await db.settings.update("settings", { future_field: "keep me" } as never);
+    const s = await repo.updateSettings({ sound: false });
+    expect((s as unknown as Record<string, unknown>).future_field).toBe("keep me");
+    expect((await db.settings.get("settings")) as unknown as Record<string, unknown>).toMatchObject({ future_field: "keep me", sound: false });
+    // Draft fields the schema does not know are still dropped; only stored ones are kept.
+    const again = await repo.updateSettings({ junk: 1 } as never);
+    expect("junk" in again).toBe(false);
+    expect((again as unknown as Record<string, unknown>).future_field).toBe("keep me");
   });
 
   it("every write enqueues an outbox entry for each row it changes", async () => {
-    expect(await added(() => repo.ensureSettings())).toEqual(["settings/settings"]);
+    expect(await added(() => repo.ensureSettings())).toEqual([]); // local seed: never queued
     expect(await added(() => repo.ensureSettings())).toEqual([]); // already there: no write
     expect(await added(() => repo.updateSettings({ sound: false }))).toEqual(["settings/settings"]);
 

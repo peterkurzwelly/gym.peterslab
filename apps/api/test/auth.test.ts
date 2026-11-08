@@ -319,7 +319,8 @@ describe("middleware", () => {
   });
 
   it("non /api paths fall through to static assets", async () => {
-    for (const path of ["/", "/plan", "/assets/app.js", "/apix"]) {
+    // File-like paths only reach the Worker when the file is missing: see fallthrough.test.ts.
+    for (const path of ["/", "/plan", "/apix"]) {
       const res = await call(path, {}, noAuth);
       expect(await res.text(), path).toBe(`asset ${path}`);
     }

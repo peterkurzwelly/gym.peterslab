@@ -5,10 +5,11 @@
  */
 import type { PlannedExercise, PlannedSet, SessionPlan } from "@gym/engine";
 import type { Exercise, Session, SetLog } from "@gym/schema";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ExerciseCard, FinishBar, Pill, RestTimer, ShellDock, type SetValues } from "../../components";
-import { discardSession, finishSession, logSet, setPain, swapExercise, updateSet, useSessionLogs } from "../../data";
-import { addRest, clearRest, startRest, useRest } from "./rest";
+import { deleteSet, discardSession, finishSession, logSet, setPain, swapExercise, updateSet, useSessionLogs } from "../../data";
+import { markSessionOpen } from "../../lib/updatePolicy";
+import { addRest, clearRest, endRest, startRest, useRest } from "./rest";
 import { lastLogged, loggedKeys, logsFor, nextSlot, orderSlots, restAfter, slotKey, slotLabel } from "./slots";
 import { DiscardControl } from "./DiscardControl";
 import { QuickStartBar } from "./QuickStart";
@@ -27,6 +28,8 @@ export interface StrengthSessionProps {
   blockSwaps: Record<string, string>;
   sound: boolean;
   onFinished: (sessionId: string) => void;
+  /** Shown in the dock above the first set before the session starts (the check-in prompt). */
+  dockPrompt?: ReactNode;
 }
 
 const SCROLL_TOP_MARGIN = "64px";
@@ -49,7 +52,7 @@ function openNextEditor(pid: string) {
   if (adjust) adjust.click();
 }
 
-export function StrengthSession({ plan, session, start, exercises, today, swapping, onPreSwap, blockSwaps, sound, onFinished }: StrengthSessionProps) {
+export function StrengthSession({ plan, session, start, exercises, today, swapping, onPreSwap, blockSwaps, sound, onFinished, dockPrompt }: StrengthSessionProps) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const starting = useRef<Promise<string> | null>(null);
   const sessionId = session?.id ?? pendingId;
@@ -163,6 +166,17 @@ export function StrengthSession({ plan, session, start, exercises, today, swappi
     }
   };
 
+  /** A set logged by mistake: soft deleted, so it leaves volume, progression and the "x of y" count. */
+  const remove = async (existing: SetLog) => {
+    setNotice(null);
+    try {
+      await deleteSet(existing.id);
+    } catch (e) {
+      console.warn("[today] could not remove set", e);
+      setNotice("That set could not be removed. Try again.");
+    }
+  };
+
   const changePain = (ex: PlannedExercise, on: boolean) => {
     setPainLocal((p) => ({ ...p, [ex.exercise_id]: on }));
     if (sessionId) void setPain(sessionId, ex.exercise_id, on).catch((e) => console.warn("[today] pain", e));
@@ -187,6 +201,7 @@ export function StrengthSession({ plan, session, start, exercises, today, swappi
       const result = await finishSession(sessionId);
       if (result.error) console.warn("[today] decisions not stored", result.error);
       clearRest();
+      markSessionOpen(null);
       onFinished(sessionId);
     } catch (e) {
       console.warn("[today] finish", e);
@@ -203,6 +218,7 @@ export function StrengthSession({ plan, session, start, exercises, today, swappi
     starting.current = null;
     setPainLocal({});
     await discardSession(id);
+    markSessionOpen(null);
   };
 
   return (
@@ -220,6 +236,7 @@ export function StrengthSession({ plan, session, start, exercises, today, swappi
                 activeSetIndex={next && next.exIndex === i ? next.setIndex : null}
                 pain={painFor(ex, logged)}
                 onConfirmSet={(set, values, existing) => void confirm(ex, i, set, values, existing)}
+                onRemoveSet={(_set, existing) => void remove(existing)}
                 onPainChange={(on) => changePain(ex, on)}
                 onSwap={(id) => swap(ex, id)}
                 swapMode={swapping}
@@ -237,6 +254,7 @@ export function StrengthSession({ plan, session, start, exercises, today, swappi
 
       {!liveSession && !editing && next && plan.exercises[next.exIndex] && (
         <ShellDock>
+          {dockPrompt}
           <QuickStartBar
             exercise={plan.exercises[next.exIndex]!}
             set={plan.exercises[next.exIndex]!.sets.find((s) => s.index === next.setIndex)!}
@@ -266,9 +284,10 @@ export function StrengthSession({ plan, session, start, exercises, today, swappi
               endsAt={rest.endsAt}
               label={rest.label}
               sound={sound}
+              alert={false}
               onAdd={addRest}
               onSkip={clearRest}
-              onDone={clearRest}
+              onDone={() => endRest(sound)}
             />
           )}
           <FinishBar startedAt={liveSession.started_at} setsDone={setsDone} setsTotal={setsTotal} onFinish={() => void finish()} disabled={finishing || setsLogged === 0} />

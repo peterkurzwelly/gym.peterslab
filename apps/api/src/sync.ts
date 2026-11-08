@@ -2,7 +2,7 @@
 import { z } from "zod";
 import type { SyncResponse } from "@gym/schema";
 import { LooseTables, idsByTable, lwwWinners, serializeTables, validateTables } from "./rows";
-import { currentRev, pullSince, readUpdatedAt, writeRows } from "./store";
+import { pullSince, readSyncMeta, readUpdatedAt, writeRows } from "./store";
 
 export const DEFAULT_PULL_LIMIT = 1000;
 
@@ -12,15 +12,21 @@ export const SyncEnvelope = z.object({
   cursor: z.number().int().min(0),
   changes: LooseTables.default({}),
   limit: z.number().int().positive().max(2000).optional(),
+  epoch: z.number().int().optional(),
 });
 export type SyncEnvelope = z.infer<typeof SyncEnvelope>;
 
 export async function handleSync(db: D1Database, req: SyncEnvelope): Promise<SyncResponse> {
   const { valid, rejected } = validateTables(req.changes);
 
-  // A cursor ahead of the server's highest rev means the database was restored or reset: treat it as 0 so the client
-  // pulls everything again. Read the rev before this request's own push, which could otherwise lift it past the cursor.
-  const from = req.cursor > (await currentRev(db)) ? 0 : req.cursor;
+  // The client's history does not belong to this database when its cursor is ahead of the server's highest rev, or
+  // when it last saw another epoch (recreated, wiped or restored database). Pull from 0 and answer reset: true so the
+  // client also pushes every row it holds. Read the rev before this request's own push, which could otherwise lift it
+  // past the cursor.
+  const meta = await readSyncMeta(db);
+  const reset =
+    req.cursor > meta.rev || (req.epoch !== undefined && meta.epoch !== null && req.epoch !== meta.epoch);
+  const from = reset ? 0 : req.cursor;
 
   const stored = await readUpdatedAt(db, idsByTable(valid));
   const winners = lwwWinners(valid, stored);
@@ -37,5 +43,7 @@ export async function handleSync(db: D1Database, req: SyncEnvelope): Promise<Syn
     rejected,
     changes: pull.changes as SyncResponse["changes"],
     server_time: new Date().toISOString(),
+    reset,
+    ...(meta.epoch !== null && { epoch: meta.epoch }),
   };
 }

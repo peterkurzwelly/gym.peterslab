@@ -1,6 +1,8 @@
 /**
  * 4x4 style interval timer. Timestamp based (start time + paused total), so it survives backgrounding.
  * 3-2-1 beeps before each change and a long beep on it. Keeps the screen awake while running.
+ * The run is reported through onRunChange and can be handed back as initialRun, so the caller can keep
+ * it across a remount or a reload (tab switch, iOS evicting the app mid-interval).
  */
 import type { CardioPlan } from "@gym/engine";
 import { useEffect, useRef, useState } from "react";
@@ -17,10 +19,22 @@ export interface IntervalResult {
   hardMinutes: number;
 }
 
+/** A timer run in absolute times (ms epoch), plus its result once it is over. */
+export interface IntervalRun {
+  startedAt: number;
+  pausedAt: number | null;
+  pausedMs: number;
+  finished?: IntervalResult | null;
+}
+
 export interface IntervalTimerProps {
   plan: CardioPlan;
   onComplete: (result: IntervalResult) => void;
   sound?: boolean;
+  /** A run to resume (from storage). A finished one reports onComplete again on mount. */
+  initialRun?: IntervalRun | null;
+  /** Every change of the run: started, paused, resumed, finished. null before Start. */
+  onRunChange?: (run: IntervalRun | null) => void;
   className?: string;
 }
 
@@ -45,9 +59,11 @@ export function intervalProgress(plan: CardioPlan, elapsed: number): IntervalRes
   return { minutes: round1(total / 60), hardMinutes: round1(hard / 60) };
 }
 
-export function IntervalTimer({ plan, onComplete, sound = true, className }: IntervalTimerProps) {
-  const [run, setRun] = useState<Run | null>(null);
-  const [finished, setFinished] = useState<IntervalResult | null>(null);
+export function IntervalTimer({ plan, onComplete, sound = true, initialRun, onRunChange, className }: IntervalTimerProps) {
+  const [run, setRun] = useState<Run | null>(() =>
+    initialRun ? { startedAt: initialRun.startedAt, pausedAt: initialRun.pausedAt, pausedMs: initialRun.pausedMs } : null,
+  );
+  const [finished, setFinished] = useState<IntervalResult | null>(() => initialRun?.finished ?? null);
   const running = run != null && run.pausedAt == null && !finished;
   const now = useNow(running, 200);
   useWakeLock(running);
@@ -60,6 +76,28 @@ export function IntervalTimer({ plan, onComplete, sound = true, className }: Int
 
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const onRunChangeRef = useRef(onRunChange);
+  onRunChangeRef.current = onRunChange;
+
+  // A run that was already over when it was handed back: report its result again (once, on mount).
+  const restoredResult = useRef(initialRun?.finished ?? null);
+  useEffect(() => {
+    const r = restoredResult.current;
+    if (!r) return;
+    restoredResult.current = null;
+    onCompleteRef.current(r);
+  }, []);
+
+  useEffect(() => {
+    onRunChangeRef.current?.(run ? { ...run, finished } : null);
+  }, [run, finished]);
+  // The caller usually swaps the timer for the log form on completion, so the result is reported right away.
+  const complete = (result: IntervalResult) => {
+    setFinished(result);
+    if (run) onRunChangeRef.current?.({ ...run, finished: result });
+    onCompleteRef.current(result);
+  };
+
   const beeped = useRef(new Set<string>());
   const lastElapsed = useRef(0);
   const lastIndex = useRef(0);
@@ -72,9 +110,7 @@ export function IntervalTimer({ plan, onComplete, sound = true, className }: Int
 
     if (pos.done) {
       if (sound && !jumped) beepLong();
-      const result = intervalProgress(plan, pos.total);
-      setFinished(result);
-      onCompleteRef.current(result);
+      complete(intervalProgress(plan, pos.total));
       return;
     }
     if (pos.index !== lastIndex.current) {
@@ -98,11 +134,7 @@ export function IntervalTimer({ plan, onComplete, sound = true, className }: Int
   };
   const pause = () => setRun((r) => (r && r.pausedAt == null ? { ...r, pausedAt: Date.now() } : r));
   const resume = () => setRun((r) => (r && r.pausedAt != null ? { ...r, pausedMs: r.pausedMs + Date.now() - r.pausedAt, pausedAt: null } : r));
-  const endNow = () => {
-    const result = intervalProgress(plan, elapsed);
-    setFinished(result);
-    onCompleteRef.current(result);
-  };
+  const endNow = () => complete(intervalProgress(plan, elapsed));
 
   const isHard = seg?.kind === "hard";
   const totalS = pos.total;

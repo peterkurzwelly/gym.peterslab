@@ -170,8 +170,16 @@ export async function writeRows(db: D1Database, input: WriteInput): Promise<Writ
 }
 
 export async function currentRev(db: D1Database): Promise<number> {
-  const row = await db.prepare(`SELECT value FROM sync_meta WHERE key = 'rev'`).first<{ value: number }>();
-  return row?.value ?? 0;
+  return (await readSyncMeta(db)).rev;
+}
+
+/** The global rev and the database epoch (null before migration 0003). */
+export async function readSyncMeta(db: D1Database): Promise<{ rev: number; epoch: number | null }> {
+  const { results } = await db
+    .prepare(`SELECT key, value FROM sync_meta WHERE key IN ('rev', 'epoch')`)
+    .all<{ key: string; value: number }>();
+  const get = (key: string) => results.find((r) => r.key === key)?.value;
+  return { rev: get("rev") ?? 0, epoch: get("epoch") ?? null };
 }
 
 export interface PullResult {

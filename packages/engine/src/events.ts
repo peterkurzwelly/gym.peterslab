@@ -1,10 +1,10 @@
 /** Readiness, spacing warnings, nudges and flags. */
-import type { Checkin, DayCode, StrengthDayCode } from "@gym/schema";
+import type { Checkin, DayCode, Muscle, StrengthDayCode } from "@gym/schema";
 import type { Flag, NextSession, Nudge, ReadinessResult, SpacingWarning, WeekVolume } from "./types";
 import type { Analysis } from "./analysis";
 import type { Norm } from "./context";
 import { checkinAverage } from "./context";
-import { addDays, daysBetween, isoWeekday, localHour, localMidnightMs } from "./dates";
+import { addDays, daysBetween, isoWeekday, localHour, localMidnightMs, weekStart } from "./dates";
 import { lerpClamped, round2 } from "./calc";
 import { nextInLine } from "./analysis";
 import { lastZeroWeekBefore } from "./weeks";
@@ -47,13 +47,30 @@ export function readinessFor(n: Norm, date: string): ReadinessCalc | null {
   return { checkin: c, average: round2(average), lowest, adjusted, sets_drop, load_cut_pct };
 }
 
-/** "Sleep 2/5: Back squat −7.5%, 1 set dropped per exercise." */
-export function readinessBanner(rc: ReadinessCalc, cutLabel: string | null): string {
+/** What the readiness rule actually changed in a plan (after rounding and the min_sets clamp). */
+export interface ReadinessEffect {
+  /** One exercise cut: its name and the load before and after. */
+  cut: { label: string; from: number; to: number } | null;
+  /** Several exercises cut (scope main_lifts / all): a label such as "Main lifts". */
+  cutGroup: string | null;
+  /** Most sets actually removed from any exercise. */
+  setsDropped: number;
+  /** Every exercise lost that many sets. */
+  everyExercise: boolean;
+}
+
+/**
+ * "Sleep 2/5: Back squat 65 → 60 kg, 1 set dropped per exercise." Built from what actually changed, so it never
+ * claims a cut or a dropped set the numbers do not show (CLAUDE.md rule 3).
+ */
+export function readinessBanner(rc: ReadinessCalc, eff: ReadinessEffect): string {
   const parts: string[] = [];
-  if (cutLabel && rc.load_cut_pct > 0) parts.push(`${cutLabel} −${fmtPct(rc.load_cut_pct)}%`);
-  if (rc.sets_drop > 0) parts.push(`${plural(rc.sets_drop, "set")} dropped per exercise`);
-  if (!parts.length) parts.push("a lighter session today");
-  return `${METRIC_LABEL[rc.lowest.metric]} ${rc.lowest.value}/5: ${parts.join(", ")}.`;
+  if (eff.cut) parts.push(`${eff.cut.label} ${fmtNum(eff.cut.from)} → ${fmtNum(eff.cut.to)} kg`);
+  else if (eff.cutGroup && rc.load_cut_pct > 0) parts.push(`${eff.cutGroup} about −${fmtPct(rc.load_cut_pct)}%`);
+  if (eff.setsDropped > 0) parts.push(`${plural(eff.setsDropped, "set")} dropped${eff.everyExercise ? " per exercise" : " where there was room"}`);
+  const head = `${METRIC_LABEL[rc.lowest.metric]} ${rc.lowest.value}/5`;
+  if (!parts.length) return `${head}: noted. The session is already light, nothing more to take off.`;
+  return `${head}: ${parts.join(", ")}.`;
 }
 
 export function readinessCardioBanner(rc: ReadinessCalc, minutes: number): string {
@@ -171,14 +188,19 @@ export function spacing(an: Analysis, code: DayCode, intensity: "easy" | "hard")
 
 // ---------------- nudges ----------------
 
-/** Never miss twice (`event.never_miss_twice`): floor not reached and enough hours since the last strength session (or block start). */
+/**
+ * Never miss twice (`event.never_miss_twice`): floor not reached and enough hours since the latest of the last
+ * strength session, 00:00 on this week's Monday and block start. The week bound keeps a normal weekend gap
+ * after a good week from turning it on every Monday (D19).
+ */
 export function neverMissTwice(an: Analysis, code: StrengthDayCode, doneToday: boolean): Nudge | null {
   const { n, wf } = an;
   if (wf.current.floor_reached || doneToday) return null;
   const blockStartMs = localMidnightMs(n.blockStart, n.tz);
+  const weekStartMs = localMidnightMs(weekStart(n.today), n.tz);
   const last = an.rp.lastStrengthLike;
   const lastMs = last ? Date.parse(last.endedIso ?? last.lastActivityIso) : -Infinity;
-  const refMs = Math.max(lastMs, blockStartMs);
+  const refMs = Math.max(lastMs, blockStartMs, weekStartMs);
   if (n.atMs - refMs < n.config.never_miss_twice.hours * 3_600_000) return null;
   const day = n.dayByCode.get(code);
   const short = day?.has_short_version && day.short_minutes;
@@ -283,7 +305,11 @@ export function buildNudges(an: Analysis, next: NextSession, mods: PlanModifiers
 
 // ---------------- flags ----------------
 
-export function buildFlags(an: Analysis, volume: WeekVolume[]): Flag[] {
+/**
+ * Flags. `programVolume` gives the fractional sets per muscle the program as written plans for a training week; volume
+ * flags only fire when the week is outside the band and further from it than that plan (ENGINE_RULES 7).
+ */
+export function buildFlags(an: Analysis, volume: WeekVolume[], programVolume?: (tw: number) => Partial<Record<Muscle, number>>): Flag[] {
   const { n, rp, wf } = an;
   const out: Flag[] = [];
   const nameOf = (id: string) => n.exercises[id]?.name ?? id;
@@ -323,16 +349,19 @@ export function buildFlags(an: Analysis, volume: WeekVolume[]): Flag[] {
     out.push({ kind: "pain", rule_id: "dp.pain", text: `${nameOf(exId)}: pain logged last time. An alternative may feel better.`, date: n.today, exercise_id: exId });
   }
 
-  // Volume flags for the last completed week in a band phase.
+  // Volume flags for the last completed week in a band phase. A zero week has no volume to judge (a missed week is
+  // never a deficit), and what the program itself prescribes is not flagged: only deviations beyond it.
   const lastDone = [...wf.weeks].reverse().find((w) => w.is_complete);
   const vol = lastDone ? volume.find((v) => v.week_id === lastDone.id) : undefined;
-  if (lastDone && vol?.band) {
+  if (lastDone && !lastDone.is_zero && vol?.band) {
+    const plan = programVolume?.(lastDone.training_week);
     for (const m of n.config.volume.tracked_muscles) {
       const v = vol.by_muscle[m] ?? 0;
+      const p = plan?.[m];
       const label = capitalize(m.replace(/_/g, " "));
-      if (v < vol.band.min) {
+      if (v < vol.band.min && (p == null || v < p - 1e-9)) {
         out.push({ kind: "volume_low", rule_id: "volume.band", text: `${label}: ${v === 1 ? "1 set" : `${fmtNum(v)} sets`} last week, band is ${vol.band.min} to ${vol.band.max}.`, date: lastDone.end_date, exercise_id: null });
-      } else if (v > vol.band.max) {
+      } else if (v > vol.band.max && (p == null || v > p + 1e-9)) {
         out.push({ kind: "volume_high", rule_id: "volume.band", text: `${label}: ${v === 1 ? "1 set" : `${fmtNum(v)} sets`} last week, band is ${vol.band.min} to ${vol.band.max}.`, date: lastDone.end_date, exercise_id: null });
       }
     }

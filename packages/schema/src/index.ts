@@ -476,12 +476,15 @@ export type Changes = Partial<{ [K in SyncTable]: RowOf<K>[] }>;
  * Server applies last-write-wins on updated_at (strictly newer wins; ties keep the server row),
  * stamps every accepted row with a new monotonically increasing rev, and returns rows with rev > cursor,
  * at most `limit` rows in total; `more: true` means call again with the returned cursor.
+ * `reset: true` means the server pulled from 0 because it did not recognise the client's cursor or epoch.
  */
 export const SyncRequest = z.object({
   client_id: z.string().min(1).max(64),
   cursor: z.number().int().min(0),
   changes: Changes,
   limit: z.number().int().positive().max(2000).optional(),
+  /** The server epoch this client last saw (SyncResponse.epoch). Omitted before the first sync. */
+  epoch: z.number().int().optional(),
 });
 export type SyncRequest = z.infer<typeof SyncRequest>;
 
@@ -492,6 +495,13 @@ export const SyncResponse = z.object({
   rejected: z.array(z.object({ table: z.string(), id: z.string(), reason: z.string() })),
   changes: Changes,
   server_time: IsoDateTime,
+  /**
+   * true when the server did not recognise the client's history (cursor ahead of the server rev, or a different
+   * epoch: the database was recreated, wiped or restored) and pulled from 0. The client then pushes every row it holds.
+   */
+  reset: z.boolean().optional(),
+  /** Random id of the server database's history. Changes when the database is recreated, wiped or restored. */
+  epoch: z.number().int().optional(),
 });
 export type SyncResponse = z.infer<typeof SyncResponse>;
 

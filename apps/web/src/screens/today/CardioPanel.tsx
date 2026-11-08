@@ -1,10 +1,11 @@
 /**
  * Cardio inline on Today: interval timer (segments from the plan, screen kept awake), then a log form
- * prefilled from the timer. "Log without timer" goes straight to the form.
+ * prefilled from the timer. "Log without timer" goes straight to the form (offered until the timer starts).
+ * The timer run is kept in sessionStorage per session, so a tab switch or a reload resumes it.
  */
 import type { CardioPlan } from "@gym/engine";
 import type { CardioModality, Session } from "@gym/schema";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -16,10 +17,12 @@ import {
   describeCardio,
   type CardioLogValues,
   type IntervalResult,
+  type IntervalRun,
 } from "../../components";
 import { discardSession, finishSession, logCardio, startCardioSession } from "../../data";
 import { fmtApproxMin, fmtClock } from "../../lib/format";
-import { readCardioModality, writeCardioModality } from "./storage";
+import { markSessionOpen } from "../../lib/updatePolicy";
+import { readCardioModality, readIntervalRun, writeCardioModality, writeIntervalRun } from "./storage";
 
 export interface CardioPanelProps {
   plan: CardioPlan;
@@ -39,6 +42,15 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
   const [result, setResult] = useState<IntervalResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const sessionId = session?.id ?? null;
+  // A run from before a remount or reload of this panel, for this session only.
+  const storedRun = useMemo(() => readIntervalRun(sessionId), [sessionId]);
+  const [timerStarted, setTimerStarted] = useState(storedRun != null);
+  const onRunChange = (run: IntervalRun | null) => {
+    setTimerStarted(run != null);
+    writeIntervalRun(sessionId, run);
+  };
 
   const modalities: CardioModality[] = plan.modality_options.length ? plan.modality_options : ["bike", "rower"];
   const remembered = readCardioModality() as CardioModality | null;
@@ -80,6 +92,8 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
       const fin = await finishSession(s.id);
       if (fin.error) console.warn("[today] cardio decisions not stored", fin.error);
       writeCardioModality(v.modality);
+      writeIntervalRun(null, null);
+      markSessionOpen(null);
       onSaved(s.id);
     } catch (e) {
       console.warn("[today] cardio save", e);
@@ -89,16 +103,23 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
   };
 
   const close = async () => {
-    if (session) await discardSession(session.id).catch((e) => console.warn("[today] cardio discard", e));
+    setAsking(false);
+    writeIntervalRun(null, null);
+    if (session) {
+      await discardSession(session.id).catch((e) => console.warn("[today] cardio discard", e));
+      markSessionOpen(null);
+    }
     onClose();
   };
+  // Nothing to lose before the timer starts: close at once. After that, ask inline first.
+  const onX = () => (session && (timerStarted || stage === "log") ? setAsking(true) : void close());
 
   return (
     <Card
       className={className}
       label={`Cardio · ${plan.counts_as === "target" ? "counts toward target" : "bonus"}`}
       meta={
-        <button type="button" aria-label={session ? "Discard cardio" : "Close cardio"} onClick={() => void close()} className="-mr-3 grid h-9 w-11 place-items-center text-paper-dim active:text-paper">
+        <button type="button" aria-label={session ? "Discard cardio" : "Close cardio"} onClick={onX} className="-mr-3 -my-1 grid h-11 w-11 place-items-center text-paper-dim active:text-paper">
           <CloseIcon size={18} />
         </button>
       }
@@ -110,20 +131,41 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
       <p className="mt-1 text-[12px] leading-snug text-paper-faint">{plan.reason}</p>
       {hard && <SpacingWarnings warnings={plan.warnings} className="mt-3" />}
 
+      {asking && (
+        <div className="mt-4 rounded-[3px] border border-line bg-ink-2/50 px-4 py-3" role="group" aria-label="Discard cardio">
+          <p className="m-0 text-[14px] leading-snug text-paper">
+            Discard this cardio? <span className="text-paper-dim">The timer stops and nothing is logged.</span>
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button variant="secondary" size="md" className="flex-1" onClick={() => void close()}>
+              Discard
+            </Button>
+            <Button variant="ghost" size="md" className="flex-1" onClick={() => setAsking(false)}>
+              Keep it
+            </Button>
+          </div>
+        </div>
+      )}
+
       {stage === "timer" ? (
         <>
           <IntervalTimer
             className="mt-5"
             plan={plan}
             sound={sound}
+            initialRun={storedRun}
+            onRunChange={onRunChange}
             onComplete={(r) => {
               setResult(r);
               setStage("log");
             }}
           />
-          <Button variant="ghost" size="md" block className="mt-2" onClick={() => setStage("log")}>
-            Log without timer
-          </Button>
+          {/* Once the timer runs, End is the way out: it carries the minutes into the log. */}
+          {!timerStarted && (
+            <Button variant="ghost" size="md" block className="mt-2" onClick={() => setStage("log")}>
+              Log without timer
+            </Button>
+          )}
         </>
       ) : (
         <div className="mt-5">

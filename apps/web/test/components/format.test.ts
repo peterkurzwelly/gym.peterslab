@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exerciseSummary, lastTimeText } from "../../src/components/ExerciseCard";
-import { changeDelta, changeDeltaFor, changeNextLine } from "../../src/components/SummaryView";
+import { changeDelta, changeDeltaFor, changeNextLine, isStartingLoad, loadText } from "../../src/components/SummaryView";
 import { weekDoneText } from "../../src/components/WeekCard";
 import { backSquat, benchTopSet, farmersCarry, goals, plank, pullUp, splitSquat, summaryA, weekTarget } from "../../src/components/__fixtures__";
 import { fmtAmount, fmtApproxMin, fmtClock, fmtKg, fmtKgDelta, fmtLoad, fmtLocalDate, fmtMinutes, fmtRange, fmtRangeAmount, fmtRelativeDate } from "../../src/lib/format";
@@ -80,5 +80,19 @@ describe("component text helpers", () => {
     expect(changeDeltaFor({ ...base, from: null, to: { weight: 0, reps: 30 } }, plankShape)).toBe("aim 30 s");
     expect(changeDeltaFor({ ...base, from: { weight: null, reps: 8 }, to: { weight: 25, reps: 8 } })).toBe("25 kg");
     expect(changeDeltaFor({ ...base, from: { weight: null, reps: 12 }, to: { weight: 10, reps: 12 } }, { per_hand: true })).toBe("10 kg/hand");
+  });
+
+  it("after calibration the line names the starting weight, never 'aim n' or '0 kg'", () => {
+    const base = { exercise_id: "back_squat", name: "Back squat", rule_id: "dp.increase", decision_id: "d1", explanation: "" };
+    const calib = { ...base, from: { weight: null, reps: 8 }, to: { weight: 25, reps: 5 } };
+    expect(isStartingLoad(calib)).toBe(true);
+    expect(changeDeltaFor(calib)).toBe("25 kg");
+    expect(changeNextLine(calib.to, {}, { start: true })).toBe("Start at 25 kg × 5 next time");
+    expect(changeNextLine({ weight: 2.5, reps: 6 }, { bodyweight: true }, { start: true })).toBe("Start at BW+2.5 × 6 next time");
+    expect(changeDeltaFor({ ...base, from: { weight: null, reps: 6 }, to: { weight: 2.5, reps: 6 } }, { bodyweight: true })).toBe("BW+2.5");
+    expect(isStartingLoad({ from: { weight: 60, reps: 8 }, to: { weight: 62.5, reps: 5 } })).toBe(false);
+    // Bodyweight at 0: no load at all.
+    expect(loadText(0, { bodyweight: true })).toBeNull();
+    expect(changeNextLine({ weight: 0, reps: 8 }, { bodyweight: true })).toBe("Next: 8");
   });
 });

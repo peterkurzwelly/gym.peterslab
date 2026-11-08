@@ -8,7 +8,7 @@
  */
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { cx } from "../lib/cx";
 import { installAudioUnlock } from "../lib/sound";
 import { GearIcon, PlanIcon, ProgressIcon, TodayIcon } from "./Icons";
@@ -54,6 +54,13 @@ export function AppShell({ children, title, sync, dock }: AppShellProps) {
 
   // iOS only plays audio after a gesture: unlock on the first tap anywhere.
   useEffect(() => installAudioUnlock(), []);
+
+  // A tab opens at its top, not at the previous tab's scroll offset. Child effects run first, so a running
+  // session on Today still lands on its next set (it scrolls after a short delay).
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo?.(0, 0);
+  }, [pathname]);
 
   // Keep content scrollable past the dock, whatever is in it.
   useLayoutEffect(() => {

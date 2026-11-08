@@ -5,6 +5,7 @@ import { SyncDot } from "./components/SyncDot";
 import { bootData, useSettings, useSyncStatus } from "./data";
 import { setSoundEnabled } from "./lib/sound";
 import { TodayScreen } from "./screens/Today";
+import { RestChip, RestWatcher } from "./screens/today/RestAlert";
 
 // Today is eager (cold open to first set in ≤ 5 s). The rest load on demand.
 const PlanScreen = lazy(() => import("./screens/Plan").then((m) => ({ default: m.PlanScreen })));
@@ -32,7 +33,16 @@ export function App() {
   }, [settings]);
 
   return (
-    <AppShell sync={<HeaderSync />}>
+    <AppShell
+      sync={
+        <>
+          <RestChip />
+          <HeaderSync />
+        </>
+      }
+    >
+      {/* The end of a rest beeps on every tab, not only under Today's dock timer. */}
+      <RestWatcher sound={settings?.sound ?? true} />
       <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<TodayScreen />} />

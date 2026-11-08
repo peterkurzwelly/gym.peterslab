@@ -69,14 +69,13 @@ export function buildWeeks(n: Norm): WeeksCalc {
   }
 
   for (const s of n.sessions) {
-    const idx = daysBetween(n.blockMonday, weekStart(s.date)) / 7;
+    const idx = weekIndexOf(n, s.date);
     s.weekIndex = idx >= 0 && idx < count ? idx : -1;
     const w = weeks[s.weekIndex];
     if (w && s.qualifying) w.sessions.push(s);
   }
   for (const walk of n.walks) {
-    const idx = daysBetween(n.blockMonday, weekStart(walk.date)) / 7;
-    const w = weeks[idx];
+    const w = weeks[weekIndexOf(n, walk.date)];
     if (w) w.walking_minutes += walk.minutes;
   }
 
@@ -93,7 +92,6 @@ export function buildWeeks(n: Norm): WeeksCalc {
   const qIndex = new Map(n.qualifying.map((s, i) => [s.id, i]));
   const { short_days_max, long_restart_week } = config.break;
   let tw = 1;
-  let extension = 0;
   for (const w of weeks) {
     const first = w.sessions[0];
     if (first) {
@@ -110,19 +108,29 @@ export function buildWeeks(n: Norm): WeeksCalc {
       }
     }
     w.tw = tw;
-    if (w.is_complete) {
-      if (w.is_zero) extension += 1;
-      else tw += 1;
-    }
+    if (w.is_complete && !w.is_zero) tw += 1;
   }
 
-  return { weeks, current: weeks[weeks.length - 1]!, extension };
+  // How many calendar weeks the block runs longer than planned: zero weeks plus the weeks a long break restart
+  // took back. Each completed non zero week advances tw by one, so this is the current calendar index − tw.
+  const current = weeks[weeks.length - 1]!;
+  const extension = Math.max(0, current.calendar_index - current.tw);
+
+  return { weeks, current, extension };
+}
+
+/**
+ * Calendar week index (0 = week 1) of a local date, before the range check. Activity dated in the 7 days before
+ * the block's Monday counts toward week 1 (D18), so that week maps to 0 as well.
+ */
+export function weekIndexOf(n: Norm, date: string): number {
+  const idx = daysBetween(n.blockMonday, weekStart(date)) / 7;
+  return idx === -1 ? 0 : idx;
 }
 
 /** Week calc for a local date, or undefined before the block / after today. */
 export function weekForDate(n: Norm, wc: WeeksCalc, date: string): WeekCalc | undefined {
-  const idx = daysBetween(n.blockMonday, weekStart(date)) / 7;
-  return wc.weeks[idx];
+  return wc.weeks[weekIndexOf(n, date)];
 }
 
 /** Latest completed zero week that ended before a local date. */

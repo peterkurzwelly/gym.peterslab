@@ -29,7 +29,7 @@ it("logs a full session offline, survives a restart, then syncs every row exactl
   syncClient.configure({ fetch: offlineFetch, debounceMs: 5, intervalMs: 60_000 });
   syncClient.start();
 
-  await repo.ensureSettings();
+  await repo.updateSettings({ interval_modality: "rower" }); // a settings edit offline
   await repo.saveCheckin({ date: "2026-11-08", sleep: 4, soreness: 4, stress: 3, energy: 4 });
   const s = await repo.startSession({ code: "A", mode: "full" });
 

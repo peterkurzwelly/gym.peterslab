@@ -19,6 +19,8 @@ export interface ExerciseCardProps {
   pain: boolean;
   /** `existing` is the log being edited, or null for a new set. */
   onConfirmSet: (set: PlannedSet, values: SetValues, existing: SetLog | null) => void;
+  /** Removes a logged set (a mis-tap). Offered in the editor of done sets when set. */
+  onRemoveSet?: (set: PlannedSet, existing: SetLog) => void;
   onPainChange: (on: boolean) => void;
   /** Session swap. The panel is only offered when this is set. */
   onSwap?: (exerciseId: string) => void;
@@ -58,7 +60,7 @@ export function lastTimeText(last: LastTime, ex: PlannedExercise): string {
 
 const SWAP_LABEL = { session: "Swapped today", block: "Swapped for block", limitation: "Limitation swap" } as const;
 
-export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onConfirmSet, onPainChange, onSwap, swapMode, equipment, position, today, circuit, className }: ExerciseCardProps) {
+export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onConfirmSet, onRemoveSet, onPainChange, onSwap, swapMode, equipment, position, today, circuit, className }: ExerciseCardProps) {
   const [altOpen, setAltOpen] = useState(false);
   const logs = logged.filter((l) => l.deleted_at == null && !l.is_warmup).sort((a, b) => a.set_index - b.set_index);
   const byIndex = new Map(logs.map((l) => [l.set_index, l]));
@@ -140,6 +142,7 @@ export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onCon
               fallbackWeight={set.weight == null ? pickedBefore(set.index) : null}
               startWeight={startWeight}
               onConfirm={(values) => onConfirmSet(set, values, log)}
+              onRemove={log && onRemoveSet ? () => onRemoveSet(set, log) : undefined}
             />
           );
         })}

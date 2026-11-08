@@ -38,7 +38,7 @@ export function SummaryScreen() {
           </p>
         ))
       : null;
-    body = <SummaryView summary={summary} onDone={done} blockWeeks={state?.block.block_weeks} goals={ctx?.config.week} detail={detail} exercises={ctx?.exercises} />;
+    body = <SummaryView summary={summary} onDone={done} blockWeeks={state?.block.block_weeks} goals={ctx?.config.week} detail={detail} exercises={ctx?.exercises} docked />;
   } else {
     body = (
       <Card label="Summary">

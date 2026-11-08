@@ -1,11 +1,16 @@
 /**
  * Outbox sync with POST /api/sync. Dexie is the source of truth on the device; the network is optional.
  * Push: latest row per (table, id) from the outbox. Pull: last-write-wins on updated_at.
+ * Rows the server refuses stay in the outbox and are retried on the next sync.
+ * Pulled rows keep fields this bundle does not know; a pulled row it cannot parse is held in meta "quarantine"
+ * (retried every sync, so it lands once the app updates) instead of failing the page.
+ * reset: true from the server (recreated, wiped or restored database) re-queues every local row.
  * Never throws into the UI: every outcome lands in the status store.
  */
 import { useSyncExternalStore } from "react";
 import type { Table } from "dexie";
 import { ulid } from "ulid";
+import { z } from "zod";
 import { SYNC_TABLES, SyncResponse, TableSchemas, type Changes, type RowOf, type SyncRequest, type SyncTable } from "@gym/schema";
 import { db as defaultDb, getMeta, setMeta, type WorkoutDb } from "./db";
 import { ApiError, apiJson } from "./api";
@@ -44,12 +49,47 @@ type AnyTable = Table<AnyRow, string>;
 
 interface Batch {
   changes: Changes;
-  /** Outbox seqs covered by this push; deleted only after the server accepted the request. */
-  seqs: number[];
+  /** Outbox entries covered by this push; deleted only after the server accepted the request (refused rows stay). */
+  entries: { seq: number; key: string }[];
   /** Distinct rows left in the outbox beyond this batch. */
   hasMore: boolean;
-  invalid: number;
+  /** Keys of rows this bundle could not validate: not pushed, kept in the outbox. */
+  invalid: string[];
 }
+
+/** A pulled row this bundle could not parse (unknown table or value), kept until a later bundle can. */
+interface HeldRow {
+  table: string;
+  row: unknown;
+}
+
+/** Response envelope; rows are validated one by one so one row this bundle cannot parse does not stall sync. */
+const ResponseEnvelope = SyncResponse.extend({ changes: z.record(z.string(), z.array(z.unknown())) });
+type ResponseEnvelope = z.infer<typeof ResponseEnvelope>;
+
+/** Row schemas that keep unknown fields, so a row from a newer version survives here and is pushed back intact. */
+const LooseSchemas = Object.fromEntries(
+  SYNC_TABLES.map((t) => [t, (TableSchemas[t] as z.ZodObject).loose()]),
+) as unknown as Record<SyncTable, z.ZodType<AnyRow>>;
+
+const isSyncTable = (t: string): t is SyncTable => (SYNC_TABLES as readonly string[]).includes(t);
+
+/** Splits rows into the ones this bundle can store (by table) and the ones it has to hold. */
+function splitRows(list: HeldRow[]): { rows: Partial<Record<SyncTable, AnyRow[]>>; held: HeldRow[] } {
+  const rows: Partial<Record<SyncTable, AnyRow[]>> = {};
+  const held: HeldRow[] = [];
+  for (const { table, row } of list) {
+    const parsed = isSyncTable(table) ? LooseSchemas[table].safeParse(row) : null;
+    if (parsed?.success) (rows[table as SyncTable] ??= []).push(parsed.data);
+    else held.push({ table, row });
+  }
+  return { rows, held };
+}
+
+const heldKey = ({ table, row }: HeldRow) => {
+  const id = row && typeof row === "object" && "id" in row ? String((row as { id: unknown }).id) : "";
+  return keyOf(table, id);
+};
 
 const DEFAULTS = {
   endpoint: "/api/sync",
@@ -224,14 +264,19 @@ export class SyncClient {
     this.setStatus({ state: "syncing" });
     try {
       const clientId = await this.getClientId();
+      await this.retryHeld();
       let rejected = 0;
       let invalid = 0;
       let more = true;
+      // Rows refused in this run: kept in the outbox for the next sync, but not resent in this one.
+      const skip = new Set<string>();
       for (let round = 0; more && round < this.opts.maxRounds; round++) {
-        const batch = await this.collectBatch();
-        invalid += batch.invalid;
+        const batch = await this.collectBatch(skip);
+        invalid += batch.invalid.length;
         const cursor = (await getMeta<number>("cursor", this.db)) ?? 0;
+        const epoch = await getMeta<number>("epoch", this.db);
         const body: SyncRequest = { client_id: clientId, cursor, changes: batch.changes };
+        if (epoch !== undefined) body.epoch = epoch;
         if (this.opts.pullLimit) body.limit = this.opts.pullLimit;
 
         const json = await apiJson(
@@ -239,15 +284,18 @@ export class SyncClient {
           { method: "POST", body },
           { fetch: this.opts.fetch, database: this.db, keepalive: opts.keepalive },
         );
-        const parsed = SyncResponse.safeParse(json);
+        const parsed = ResponseEnvelope.safeParse(json);
         if (!parsed.success) throw new ApiError("error", "Unexpected sync response");
         const res = parsed.data;
         if (res.rejected.length) {
           rejected += res.rejected.length;
           console.warn("[sync] server refused rows", res.rejected.map((r) => `${r.table}/${r.id}: ${r.reason}`));
         }
-        await this.applyResponse(res, batch);
-        more = res.more || batch.hasMore;
+        const refused = new Set([...batch.invalid, ...res.rejected.map((r) => keyOf(r.table, r.id))]);
+        for (const key of refused) skip.add(key);
+        await this.applyResponse(res, batch, refused);
+        // After a reset every local row is queued again: keep going until they are all pushed.
+        more = res.more || batch.hasMore || res.reset === true;
       }
 
       this.failures = 0;
@@ -281,17 +329,18 @@ export class SyncClient {
     }, delay);
   }
 
-  /** Reads the outbox and the current rows (soft-deleted included) in one consistent read. */
-  private async collectBatch(): Promise<Batch> {
+  /** Reads the outbox and the current rows (soft-deleted included) in one consistent read. Skips keys in `skip`. */
+  private async collectBatch(skip: ReadonlySet<string> = new Set()): Promise<Batch> {
     const d = this.db;
     const tables = SYNC_TABLES.map((t) => d.table(t));
     return d.transaction("r", [d.outbox, ...tables], async () => {
-      const entries = await d.outbox.orderBy("seq").toArray();
+      const outbox = await d.outbox.orderBy("seq").toArray();
       const chosen = new Map<string, { table: SyncTable; id: string }>();
-      const seqs: number[] = [];
+      const entries: Batch["entries"] = [];
       let hasMore = false;
-      for (const e of entries) {
+      for (const e of outbox) {
         const key = keyOf(e.table, e.row_id);
+        if (skip.has(key)) continue;
         if (!chosen.has(key)) {
           if (chosen.size >= this.opts.pushBatchSize) {
             hasMore = true;
@@ -299,7 +348,7 @@ export class SyncClient {
           }
           chosen.set(key, { table: e.table, id: e.row_id });
         }
-        seqs.push(e.seq!);
+        entries.push({ seq: e.seq!, key });
       }
 
       const byTable = new Map<SyncTable, string[]>();
@@ -310,37 +359,81 @@ export class SyncClient {
       }
 
       const changes: Record<string, AnyRow[]> = {};
-      let invalid = 0;
+      const invalid: string[] = [];
       for (const [table, ids] of byTable) {
         const rows = await (d.table(table) as AnyTable).bulkGet(ids);
         const valid: AnyRow[] = [];
         rows.forEach((row, i) => {
           if (!row) return; // row vanished locally; nothing to push
-          const parsed = TableSchemas[table].safeParse(row);
-          if (parsed.success) valid.push(parsed.data as AnyRow);
+          const parsed = LooseSchemas[table].safeParse(row);
+          if (parsed.success) valid.push(parsed.data);
           else {
-            invalid++;
+            invalid.push(keyOf(table, ids[i]!));
             console.warn(`[sync] skipping invalid ${table}/${ids[i]}`);
           }
         });
         if (valid.length) changes[table] = valid;
       }
-      return { changes: changes as Changes, seqs, hasMore, invalid };
+      return { changes: changes as Changes, entries, hasMore, invalid };
     });
   }
 
-  /** Applies pulled rows (LWW, no outbox), drops the pushed outbox entries and stores the cursor, atomically. */
-  private async applyResponse(res: SyncResponse, batch: Batch): Promise<void> {
+  /**
+   * Applies pulled rows (LWW, no outbox), drops the pushed outbox entries except refused ones, re-queues every local
+   * row after a server reset, and stores cursor and epoch, atomically.
+   */
+  private async applyResponse(res: ResponseEnvelope, batch: Batch, refused: ReadonlySet<string>): Promise<void> {
     const d = this.db;
     const tables = SYNC_TABLES.map((t) => d.table(t));
+    const pulled = splitRows(Object.entries(res.changes).flatMap(([table, rows]) => rows.map((row) => ({ table, row }))));
     await d.transaction("rw", [d.outbox, d.meta, ...tables], async () => {
       for (const table of SYNC_TABLES) {
-        const incoming = res.changes[table] as AnyRow[] | undefined;
+        const incoming = pulled.rows[table];
         if (incoming?.length) await applyLww(d.table(table) as AnyTable, incoming);
       }
+      if (pulled.held.length) await this.hold(pulled.held);
       // Only the entries this push covered. Writes queued during the request have other seqs and stay.
-      if (batch.seqs.length) await d.outbox.bulkDelete(batch.seqs);
+      const done = batch.entries.filter((e) => !refused.has(e.key)).map((e) => e.seq);
+      if (done.length) await d.outbox.bulkDelete(done);
+      if (res.reset) {
+        // The server's database is not the one this device synced with: push everything this device holds,
+        // soft-deleted rows included. Rows the server already has tie under LWW and are not written again.
+        const queued_at = nowIso();
+        for (const t of SYNC_TABLES) {
+          const ids = (await d.table(t).toCollection().primaryKeys()) as string[];
+          if (ids.length) await d.outbox.bulkAdd(ids.map((row_id) => ({ table: t, row_id, queued_at })));
+        }
+      }
       await d.meta.put({ key: "cursor", value: res.cursor });
+      if (res.epoch !== undefined) await d.meta.put({ key: "epoch", value: res.epoch });
+    });
+  }
+
+  /** Adds pulled rows this bundle cannot parse to the quarantine (newest per table and id). Call inside a transaction. */
+  private async hold(rows: HeldRow[]): Promise<void> {
+    console.warn("[sync] holding rows this version cannot read", rows.map(heldKey));
+    const merged = new Map<string, HeldRow>();
+    for (const r of [...((await getMeta<HeldRow[]>("quarantine", this.db)) ?? []), ...rows]) {
+      const key = heldKey(r);
+      merged.delete(key); // pull order is rev order: the later copy is the newer one
+      merged.set(key, r);
+    }
+    await this.db.meta.put({ key: "quarantine", value: [...merged.values()] });
+  }
+
+  /** Applies quarantined rows this bundle can parse now (after an app update), LWW like any pull. */
+  private async retryHeld(): Promise<void> {
+    const d = this.db;
+    if (!(await getMeta<HeldRow[]>("quarantine", d))?.length) return;
+    const tables = SYNC_TABLES.map((t) => d.table(t));
+    await d.transaction("rw", [d.meta, ...tables], async () => {
+      const { rows, held } = splitRows((await getMeta<HeldRow[]>("quarantine", d)) ?? []);
+      for (const table of SYNC_TABLES) {
+        const incoming = rows[table];
+        if (incoming?.length) await applyLww(d.table(table) as AnyTable, incoming);
+      }
+      if (held.length) await d.meta.put({ key: "quarantine", value: held });
+      else await d.meta.delete("quarantine");
     });
   }
 

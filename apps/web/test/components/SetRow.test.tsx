@@ -73,14 +73,46 @@ describe("SetRow", () => {
     expect(onConfirm).toHaveBeenCalledWith({ weight: 62.5, reps: 8, rir: 2 });
   });
 
-  it("timed bodyweight work hides the load and steps seconds by 5", () => {
+  it("timed bodyweight work hides a zero load and steps seconds by 5", () => {
     const onConfirm = vi.fn();
-    render(<SetRow set={plank.sets[0]!} exercise={plank} isNext onConfirm={onConfirm} />);
+    const { container } = render(<SetRow set={plank.sets[0]!} exercise={plank} isNext onConfirm={onConfirm} />);
+    expect(container.textContent).not.toMatch(/kg|BW/);
     fireEvent.click(screen.getByRole("button", { name: /^Adjust set 1/ }));
-    expect(screen.queryByRole("button", { name: "Increase weight" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Increase seconds" }));
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(onConfirm).toHaveBeenCalledWith({ weight: 0, reps: 40, rir: 3 });
+  });
+
+  it("timed bodyweight work can add load, after the seconds, so 'add load' advice can be followed", () => {
+    const onConfirm = vi.fn();
+    render(<SetRow set={plank.sets[0]!} exercise={plank} isNext onConfirm={onConfirm} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Adjust set 1/ }));
+    const labels = screen.getAllByRole("button", { name: /^Increase / }).map((b) => b.getAttribute("aria-label"));
+    expect(labels).toEqual(["Increase seconds", "Increase added"]);
+    fireEvent.click(screen.getByRole("button", { name: "Increase added" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase added" }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onConfirm).toHaveBeenCalledWith({ weight: 5, reps: 35, rir: 3 });
+    // Logged with a plate: the row shows it as added load, never "kg" on bodyweight.
+    cleanup();
+    render(<SetRow set={plank.sets[0]!} exercise={plank} logged={{ weight: 5, reps: 35, rir: 3 }} onConfirm={() => {}} />);
+    expect(screen.getByText("BW+5")).toBeTruthy();
+  });
+
+  it("a done set's editor offers Remove set; a pending one does not", () => {
+    const onRemove = vi.fn();
+    const onConfirm = vi.fn();
+    const { rerender } = render(<SetRow set={squatSet} exercise={backSquat} isNext onConfirm={onConfirm} onRemove={onRemove} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Adjust set 1/ }));
+    expect(screen.queryByRole("button", { name: "Remove set" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel editing" }));
+
+    rerender(<SetRow set={squatSet} exercise={backSquat} logged={{ weight: 60, reps: 8, rir: 3 }} onConfirm={onConfirm} onRemove={onRemove} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit set 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove set" }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Remove set" })).toBeNull(); // editor closed
   });
 });
 
@@ -125,6 +157,19 @@ describe("calibration (no weight yet)", () => {
     expect(container.textContent).not.toMatch(/pick ×/);
     expect(screen.getAllByText(/^target /).map((n) => n.textContent)).toEqual(["target 22.5 × 8 @ 3"]);
     expect(describeShort({ weight: null, reps: 8, rir: 3 }, benchCalibration)).toBe("8 @ 3");
+  });
+
+  it("a done calibration set shows the logged values and never a 'target pick' line", () => {
+    const first = setLog(benchCalibration, 0, 22.5, 7, 3);
+    const { container } = render(
+      <ExerciseCard exercise={benchCalibration} logged={[first]} activeSetIndex={1} pain={false} equipment="barbell" onConfirmSet={() => {}} onPainChange={() => {}} />,
+    );
+    expect(screen.getByRole("button", { name: /^Edit set 1: 22.5 kg × 7 at RIR 3$/ })).toBeTruthy();
+    expect(container.textContent).not.toMatch(/target pick|pick ×|target 8/);
+    expect(screen.getByText("aim 8 @ 3")).toBeTruthy();
+    // Its editor reads "aim", not "target", too.
+    fireEvent.click(screen.getByRole("button", { name: "Edit set 1" }));
+    expect(container.textContent).toMatch(/· aim 8 @ 3/);
   });
 
   it("travel circuit cards drop the superset badge", () => {

@@ -26,8 +26,11 @@ export interface OutboxEntry {
   queued_at: string;
 }
 
-/** Known meta keys. sync_key is local only: never synced, never logged. */
-export type MetaKey = "cursor" | "client_id" | "last_sync_at" | "sync_key";
+/**
+ * Known meta keys. sync_key is local only: never synced, never logged.
+ * epoch: the server epoch last seen (SyncResponse.epoch). quarantine: pulled rows this bundle could not parse yet.
+ */
+export type MetaKey = "cursor" | "client_id" | "last_sync_at" | "sync_key" | "epoch" | "quarantine";
 export interface MetaEntry {
   key: MetaKey | (string & {});
   value: unknown;

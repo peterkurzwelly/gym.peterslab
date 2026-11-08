@@ -75,7 +75,7 @@ describe("POST /api/import", () => {
     expect(body.rejected.map((r) => `${r.table}/${r.id}`).sort()).toEqual(["set_log/bad", "unknown_table/u"]);
   });
 
-  it("replace: soft-deletes rows missing from the file and force-writes every file row", async () => {
+  it("replace: soft-deletes rows missing from the file and writes every file row stamped with the import instant", async () => {
     await sync({
       changes: {
         session: [
@@ -100,13 +100,17 @@ describe("POST /api/import", () => {
 
     const out = await exportFile();
     const byId = Object.fromEntries(out.tables.session!.map((s) => [s.id, s]));
-    expect(byId.keep).toEqual(restored); // written even though older than the server row
-    expect(byId.new_one).toEqual(added);
-    expect(byId.already_gone).toEqual(fixtures.session({ id: "already_gone", updated_at: T0, deleted_at: T0 }));
     const drop = byId.drop!;
     expect(drop.deleted_at).not.toBeNull();
     expect(drop.updated_at).toBe(drop.deleted_at);
     expect(Date.parse(drop.deleted_at!)).toBeGreaterThanOrEqual(startedAt - 1000);
+    const at = drop.deleted_at!;
+    // Written even though older than the server row, and stamped with the import instant like the soft deletes,
+    // so a device whose copy is newer than the file (T2 here) takes the restored row on its next pull.
+    expect(byId.keep).toEqual({ ...restored, updated_at: at });
+    expect(Date.parse(byId.keep!.updated_at)).toBeGreaterThan(Date.parse(T2));
+    expect(byId.new_one).toEqual({ ...added, updated_at: at });
+    expect(byId.already_gone).toEqual(fixtures.session({ id: "already_gone", updated_at: T0, deleted_at: T0 }));
     expect(out.tables.checkin![0]!.deleted_at).not.toBeNull();
 
     // Other devices see every change after their cursor.
@@ -124,7 +128,10 @@ describe("POST /api/import", () => {
     const res = await post("/api/import?mode=replace", exported);
     expect(res.status).toBe(200);
     const again = await exportFile();
-    for (const t of SYNC_TABLES) expect(again.tables[t], t).toEqual(exported.tables[t]);
+    const at = again.tables.session![0]!.updated_at;
+    for (const t of SYNC_TABLES) {
+      expect(again.tables[t], t).toEqual(exported.tables[t]!.map((r) => ({ ...r, updated_at: at })));
+    }
   });
 
   it("replace: refuses a file with invalid rows and changes nothing", async () => {

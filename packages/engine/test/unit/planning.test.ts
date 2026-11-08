@@ -237,7 +237,8 @@ describe("comeback, breaks and readiness", () => {
     expect(sq.sets).toHaveLength(2);
     expect(sq.sets[0]!.weight).toBe(80);
     expect(byPid(plan, "A2").sets[0]!.weight).toBe(70); // break only: 82.5 × 0.85 = 70.1 → 70
-    expect(plan.adjustments.find((a) => a.rule_id === "event.readiness")!.text).toBe("Energy 1/5: Back squat −7.5%, 1 set dropped per exercise.");
+    // The banner shows the cut it made (from the break adjusted load), not the configured percentage.
+    expect(plan.adjustments.find((a) => a.rule_id === "event.readiness")!.text).toBe("Energy 1/5: Back squat 87.5 → 80 kg, 1 set dropped per exercise.");
   });
 
   test("readiness severity: average ≤ 1.5 drops 2 sets and cuts 10%, min 1 set", () => {
@@ -248,7 +249,8 @@ describe("comeback, breaks and readiness", () => {
     const plan = planSession(ctxOf(h, at(day(2), "08:00")), { code: "A", mode: "full" });
     expect(byPid(plan, "A1").sets).toHaveLength(1); // 2 − 2 floored at min 1
     expect(byPid(plan, "A1").sets[0]!.weight).toBe(92.5); // 105 × 0.9 = 94.5 → 92.5
-    expect(plan.adjustments.find((a) => a.rule_id === "event.readiness")!.text).toBe("Sleep 1/5: Back squat −10%, 2 sets dropped per exercise.");
+    // Only 1 set could go (min 1), so the banner says 1, not the configured 2.
+    expect(plan.adjustments.find((a) => a.rule_id === "event.readiness")!.text).toBe("Sleep 1/5: Back squat 105 → 92.5 kg, 1 set dropped per exercise.");
   });
 
   test("readiness: the plan carries the readiness flag for strength and cardio, so the session can store it", () => {

@@ -196,11 +196,49 @@ describe("POST /api/sync", () => {
     expect(stale.accepted).toBe(0);
   });
 
-  it("a cursor ahead of the server (restored DB) resends everything", async () => {
+  it("a cursor ahead of the server (restored DB) resends everything and says reset", async () => {
     await sync({ changes: { checkin: [fixtures.checkin()] } });
     const res = await sync({ cursor: 500 });
     expect(res.changes.checkin).toHaveLength(1);
     expect(res.cursor).toBe(1);
+    expect(res.reset).toBe(true);
+    // A normal sync is not a reset.
+    expect((await sync({ cursor: 1 })).reset).toBe(false);
+    expect((await sync({ cursor: 0 })).reset).toBe(false);
+  });
+
+  describe("epoch", () => {
+    const rotateEpoch = () =>
+      env.DB.prepare(`UPDATE sync_meta SET value = value + 1 WHERE key = 'epoch'`).run();
+
+    it("every response carries the database epoch", async () => {
+      const res = await sync({});
+      expect(Number.isSafeInteger(res.epoch)).toBe(true);
+      expect((await sync({ epoch: res.epoch })).reset).toBe(false);
+    });
+
+    it("another epoch is a reset even when the cursor looks valid (wiped database, rev kept)", async () => {
+      const first = await sync({ changes: { checkin: [fixtures.checkin({ id: "ck_2026-11-01", date: "2026-11-01" })] } });
+      // Manual wipe that keeps sync_meta.rev, then the epoch is rotated as the README says. Another device writes 3 rows.
+      await env.DB.prepare(`DELETE FROM checkin`).run();
+      await rotateEpoch();
+      await sync({
+        client_id: "laptop",
+        changes: { session: [fixtures.session({ id: "s_a" }), fixtures.session({ id: "s_b" }), fixtures.session({ id: "s_c" })] },
+      });
+      const res = await sync({ cursor: first.cursor, epoch: first.epoch });
+      expect(res.reset).toBe(true);
+      expect(res.changes.session).toHaveLength(3); // pulled from 0, nothing skipped
+      expect(res.epoch).toBe(first.epoch! + 1);
+      expect((await sync({ cursor: res.cursor, epoch: res.epoch })).reset).toBe(false);
+    });
+
+    it("a client that never saw an epoch is not reset", async () => {
+      const first = await sync({ changes: { checkin: [fixtures.checkin()] } });
+      const res = await sync({ cursor: first.cursor });
+      expect(res.reset).toBe(false);
+      expect(res.changes.checkin).toEqual([]);
+    });
   });
 
   it("a cursor ahead of the reset server counts as 0 even when the same request's push lifts the rev past it", async () => {

@@ -8,6 +8,7 @@ import { setClock } from "../../src/data/clock";
 import * as repo from "../../src/data/repo";
 import { SyncClient } from "../../src/data/sync";
 import { FakeServer } from "./fakeServer";
+import { makeSettings } from "./engineMock";
 import { outboxKeys, resetDb, until } from "./helpers";
 
 let server: FakeServer;
@@ -250,5 +251,209 @@ describe("concurrency", () => {
     client.notifyWrite();
     await until(async () => (await db.outbox.count()) === 0);
     expect(server.requests.length).toBe(before + 1);
+  });
+});
+
+describe("fresh device settings", () => {
+  // Peter's real settings, synced from the iPhone on Saturday.
+  const real = {
+    ...makeSettings("2026-11-07T18:00:00.000Z"),
+    remembered_weights: { back_squat: { weight: 100, reps: 5 }, bench_press: { weight: 80, reps: 6 } },
+    block_swaps: { B3: "lat_pulldown" },
+    interval_modality: "rower" as const,
+    start_pct: 0.65,
+    sound: false,
+    evening_hour: 20,
+  };
+
+  it("the defaults seeded at boot never overwrite the real settings on the server", async () => {
+    server.seed("settings", real);
+    setClock(() => "2026-11-08T20:00:00.000Z");
+    await repo.ensureSettings(); // bootData on an empty device, before any pull
+    const status = await client.sync();
+    expect(status.state).toBe("idle");
+    expect(server.pushCount("settings", "settings")).toBe(0);
+    expect(server.get("settings", "settings")).toEqual(real);
+    expect(await db.settings.get("settings")).toEqual(real);
+  });
+
+  it("also when the sync key is pasted minutes after boot", async () => {
+    server.seed("settings", real);
+    server.mode = "401";
+    setClock(() => "2026-11-08T20:00:00.000Z");
+    await repo.ensureSettings();
+    expect((await client.sync()).state).toBe("auth_required");
+    server.mode = "ok";
+    setClock(() => "2026-11-08T20:05:00.000Z");
+    await client.setSyncKey("pasted-key");
+    await client.sync();
+    expect(server.get("settings", "settings")).toEqual(real);
+    expect(await db.settings.get("settings")).toEqual(real);
+    // The first real edit after the pull builds on the real row and wins everywhere.
+    await repo.updateSettings({ sound: true });
+    await client.sync();
+    expect(server.get("settings", "settings")).toMatchObject({ ...real, sound: true, updated_at: "2026-11-08T20:05:00.000Z" });
+  });
+});
+
+describe("server reset", () => {
+  async function loggedSession() {
+    const s = await repo.startSession({ code: "A", mode: "full" });
+    const kept = await logOneSet(s.id, 0);
+    const gone = await logOneSet(s.id, 1);
+    await repo.deleteSet(gone.id);
+    return { s, kept, gone };
+  }
+
+  it("a cursor ahead of the new server re-pushes every local row, soft-deleted included", async () => {
+    const { s, kept, gone } = await loggedSession();
+    await client.sync();
+    const oldCursor = (await getMeta<number>("cursor"))!;
+    expect(oldCursor).toBeGreaterThan(0);
+
+    // D1 recreated: empty, rev 0.
+    const fresh = new FakeServer();
+    client.configure({ fetch: fresh.fetch });
+    const status = await client.sync();
+    expect(status.state).toBe("idle");
+    expect(fresh.requests[0]!.body.cursor).toBe(oldCursor);
+    expect(fresh.get("session", s.id)).toEqual(await db.session.get(s.id));
+    expect(fresh.get("set_log", kept.id)).toEqual(await db.set_log.get(kept.id));
+    expect(fresh.get("set_log", gone.id)?.deleted_at).not.toBeNull();
+    expect(await db.outbox.count()).toBe(0);
+    expect(await getMeta("cursor")).toBe(fresh.rev);
+
+    // The next sync is a normal one: nothing pushed again.
+    const pushed = fresh.pushes.length;
+    await client.sync();
+    expect(fresh.pushes).toHaveLength(pushed);
+  });
+
+  it("a new epoch is a reset even after another device lifted the new rev past the stale cursor", async () => {
+    const { s, kept } = await loggedSession();
+    await client.sync();
+    const oldCursor = (await getMeta<number>("cursor"))!;
+    expect(await getMeta("epoch")).toBe(1);
+
+    // New database (epoch 2). The laptop synced first and wrote more rows than this phone's cursor.
+    const fresh = new FakeServer(2);
+    for (let i = 1; i <= oldCursor + 2; i++) {
+      fresh.seed("checkin", {
+        id: `ck_2026-10-${String(i).padStart(2, "0")}`, date: `2026-10-${String(i).padStart(2, "0")}`,
+        sleep: 3, soreness: 3, stress: 3, energy: 3, hrv: null, rhr: null, sleep_hours: null, hrv_type: null,
+        updated_at: "2026-11-08T08:00:00.000Z", deleted_at: null,
+      });
+    }
+    expect(fresh.rev).toBeGreaterThan(oldCursor);
+    client.configure({ fetch: fresh.fetch });
+    await client.sync();
+    expect(fresh.requests[0]!.body.epoch).toBe(1);
+    expect(await db.checkin.count()).toBe(oldCursor + 2); // none of the laptop's first rows skipped
+    expect(fresh.get("session", s.id)).toBeDefined(); // and the phone's history reached the new database
+    expect(fresh.get("set_log", kept.id)).toBeDefined();
+    expect(await getMeta("epoch")).toBe(2);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it("a server without an epoch still syncs normally", async () => {
+    const legacy = new FakeServer(null);
+    client.configure({ fetch: legacy.fetch });
+    const s = await repo.startSession({ code: "A", mode: "full" });
+    await client.sync();
+    await client.sync();
+    expect(legacy.pushCount("session", s.id)).toBe(1);
+    expect(await getMeta("epoch")).toBeUndefined();
+    expect(legacy.requests.every((r) => r.body.epoch === undefined)).toBe(true);
+  });
+});
+
+describe("refused rows", () => {
+  it("stay queued and keep the warning until the server takes them", async () => {
+    const s = await repo.startSession({ code: "A", mode: "full" });
+    const set = await logOneSet(s.id);
+    server.refuse.add(set.id);
+
+    let status = await client.sync();
+    expect(status.state).toBe("idle");
+    expect(status.lastError).toBe("1 change could not be saved on the server");
+    expect(server.get("session", s.id)).toBeDefined();
+    expect(server.get("set_log", set.id)).toBeUndefined();
+    expect(await outboxKeys()).toEqual([`set_log/${set.id}`]);
+    expect(status.pending).toBe(1);
+
+    status = await client.sync();
+    expect(status.lastError).toBe("1 change could not be saved on the server");
+    expect(server.pushCount("set_log", set.id)).toBe(2); // once per sync, not once per round
+
+    server.refuse.clear(); // e.g. after the fixed bundle
+    status = await client.sync();
+    expect(status.lastError).toBeNull();
+    expect(server.get("set_log", set.id)).toBeDefined();
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it("do not hold back the rest of the outbox", async () => {
+    client.configure({ pushBatchSize: 2 });
+    const s = await repo.startSession({ code: "A", mode: "full" });
+    const sets = [];
+    for (let i = 0; i < 4; i++) sets.push(await logOneSet(s.id, i));
+    server.refuse.add(s.id);
+    server.refuse.add(sets[0]!.id);
+
+    const status = await client.sync();
+    expect(status.lastError).toBe("2 changes could not be saved on the server");
+    for (const set of sets.slice(1)) expect(server.get("set_log", set.id)).toBeDefined();
+    expect(await outboxKeys()).toEqual([`session/${s.id}`, `set_log/${sets[0]!.id}`]);
+    expect(server.pushCount("session", s.id)).toBe(1);
+  });
+});
+
+describe("rows from a newer version", () => {
+  it("pulled rows keep fields this version does not know, and a local edit pushes them back", async () => {
+    server.seed("settings", { ...makeSettings("2026-11-07T18:00:00.000Z"), future_field: "from the laptop" });
+    await client.sync();
+    expect(await db.settings.get("settings")).toMatchObject({ future_field: "from the laptop" });
+
+    await repo.updateSettings({ sound: false });
+    await client.sync();
+    const pushed = server.requests.at(-1)!.raw.changes?.settings?.[0];
+    expect(pushed).toMatchObject({ future_field: "from the laptop", sound: false });
+  });
+
+  it("a pulled row this version cannot read is held; the rest of the page lands and the cursor moves", async () => {
+    server.seed("session", session("S_OK", "2026-11-08T12:00:00.000Z"));
+    server.extraChanges = {
+      session: [{ ...session("S_SKI", "2026-11-08T12:00:00.000Z"), mode: "ski" }],
+      future_table: [{ id: "F1" }],
+    };
+    const status = await client.sync();
+    expect(status.state).toBe("idle");
+    expect(await db.session.get("S_OK")).toBeDefined();
+    expect(await db.session.get("S_SKI")).toBeUndefined();
+    expect(await getMeta("cursor")).toBe(server.rev);
+    expect((await getMeta<{ table: string }[]>("quarantine"))?.map((h) => h.table)).toEqual(["session", "future_table"]);
+
+    // Held again on the next sync (still unreadable), never duplicated.
+    server.extraChanges = { session: [{ ...session("S_SKI", "2026-11-08T13:00:00.000Z"), mode: "ski" }] };
+    await client.sync();
+    expect(await getMeta<unknown[]>("quarantine")).toHaveLength(2);
+  });
+
+  it("held rows land once this version can read them (after an app update)", async () => {
+    setClock(() => "2026-11-08T10:00:00.000Z");
+    const local = await repo.startSession({ code: "A", mode: "full", notes: "local" });
+    await db.meta.put({
+      key: "quarantine",
+      value: [
+        { table: "session", row: session("S_HELD", "2026-11-08T12:00:00.000Z", "held") },
+        { table: "session", row: session(local.id, "2026-11-08T09:00:00.000Z", "older than local") },
+        { table: "future_table", row: { id: "F1" } },
+      ],
+    });
+    await client.sync();
+    expect((await db.session.get("S_HELD"))?.notes).toBe("held");
+    expect((await db.session.get(local.id))?.notes).toBe("local"); // LWW like any pull
+    expect(await getMeta("quarantine")).toEqual([{ table: "future_table", row: { id: "F1" } }]);
+    expect(await db.outbox.count()).toBe(0); // applied rows are not queued
   });
 });

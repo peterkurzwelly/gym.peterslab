@@ -132,7 +132,10 @@ interface Draft {
   top: { weight: number; reps: number; rir: number } | null;
   base: Decision;
   override: string | null;
-  cut: boolean;
+  /** Load before the readiness cut, when it cut this exercise. */
+  cutFrom: number | null;
+  /** Sets the readiness rule actually removed (after the min_sets clamp). */
+  readinessDropped: number;
 }
 
 export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
@@ -231,9 +234,14 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
     }
 
     // Sets: travel rounds, deload rule, or phase rule; then short and comeback reductions.
+    // Short and comeback do not add up: a short comeback session takes the larger of the two reductions (D20).
     let work = code === "TRAVEL" ? (day.rounds ?? p.sets) : deload ? deloadSets(n, p, tw) : phaseSets(n, p, phase, tw);
-    if (short) work = reduceSets(work, cfg.short_version.set_reduction, cfg.short_version.min_sets);
-    if (comeback) work = reduceSets(work, cfg.comeback.set_reduction, cfg.comeback.min_sets);
+    if (short && comeback) {
+      const sv = cfg.short_version;
+      const cb = cfg.comeback;
+      work = cb.set_reduction > sv.set_reduction ? reduceSets(work, cb.set_reduction, cb.min_sets) : reduceSets(work, sv.set_reduction, sv.min_sets);
+    } else if (short) work = reduceSets(work, cfg.short_version.set_reduction, cfg.short_version.min_sets);
+    else if (comeback) work = reduceSets(work, cfg.comeback.set_reduction, cfg.comeback.min_sets);
 
     let override: string | null = deload ? "phase.deload" : null;
     if (weight != null && weight > 0 && (mods.longBreak || breakResume)) {
@@ -242,24 +250,32 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
       override ??= mods.longBreak ? "event.break_long" : "event.break_short";
     }
 
-    let cut = false;
+    let cutFrom: number | null = null;
+    let readinessDropped = 0;
     if (readiness) {
+      const before = work;
       work = reduceSets(work, readiness.sets_drop, cfg.readiness.min_sets);
+      readinessDropped = before - work;
       if (scope.has(p.id) && weight != null && weight > 0 && readiness.load_cut_pct > 0) {
+        cutFrom = weight;
         weight = roundLoad(weight * (1 - readiness.load_cut_pct), inc, "down");
-        cut = true;
         override ??= "event.readiness";
       }
     }
 
+    // Top set at rep_min and top_set.rir from the latest e1RM, but at least one step above today's work weight: the
+    // stored e1RM can lag the work target (double progression aims above the last exposure), and a top set at or
+    // below the weight just lifted for more reps contradicts its own RIR.
     let top: Draft["top"] = null;
     const known = rp.stats.get(ex.id)?.e1rm ?? null;
     if (phase.top_set?.main_lifts && main && slot.measure === "reps" && known != null) {
       const topRir = phase.top_set.rir;
-      top = { weight: roundLoad(weightFromE1rm(known, slot.rep_min, topRir, cfg.e1rm.divisor), inc, "down"), reps: slot.rep_min, rir: topRir };
+      let topWeight = roundLoad(weightFromE1rm(known, slot.rep_min, topRir, cfg.e1rm.divisor), inc, "down");
+      if (weight != null && weight > 0) topWeight = Math.max(topWeight, roundLoad(weight + ex.step_kg, inc, "up"));
+      top = { weight: topWeight, reps: slot.rep_min, rir: topRir };
     }
 
-    drafts.push({ p, ex, slot, swapped: eff.swapped, main, inc, weight, reps, rir, calibration, work, top, base, override, cut });
+    drafts.push({ p, ex, slot, swapped: eff.swapped, main, inc, weight, reps, rir, calibration, work, top, base, override, cutFrom, readinessDropped });
   }
 
   // Session volume cap: trim non starred (last first), then starred non main, never below 1 set.
@@ -333,14 +349,20 @@ export function buildPlan(an: Analysis, opts: PlanOptions): SessionPlan {
   }
   if (readiness) {
     const scopeKind = cfg.readiness.load_cut.scope;
-    const cutDraft = drafts.find((d) => d.cut);
-    const label = !cutDraft ? null : scopeKind === "first_exercise" ? cutDraft.ex.name : scopeKind === "main_lifts" ? "Main lifts" : "All lifts";
-    const banner = readinessBanner(readiness, label);
+    const cutDrafts = drafts.filter((d) => d.cutFrom != null);
+    const one = cutDrafts.length === 1 ? cutDrafts[0]! : null;
+    const setsDropped = Math.max(0, ...drafts.map((d) => d.readinessDropped));
+    const banner = readinessBanner(readiness, {
+      cut: one ? { label: one.ex.name, from: one.cutFrom!, to: one.weight ?? 0 } : null,
+      cutGroup: cutDrafts.length > 1 ? (scopeKind === "main_lifts" ? "Main lifts" : "All lifts") : null,
+      setsDropped,
+      everyExercise: drafts.every((d) => d.readinessDropped === setsDropped),
+    });
     adjust(
       "event.readiness",
       banner,
       { checkin_id: readiness.checkin.id, average: readiness.average, lowest: readiness.lowest },
-      { sets_drop: readiness.sets_drop, load_cut_pct: readiness.load_cut_pct, scope: scopeKind },
+      { sets_drop: readiness.sets_drop, sets_dropped: setsDropped, load_cut_pct: readiness.load_cut_pct, scope: scopeKind },
     );
     flags.push("readiness");
   }

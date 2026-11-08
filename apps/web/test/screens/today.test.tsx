@@ -149,7 +149,11 @@ describe("Today · during and after a session", () => {
     await waitFor(async () => expect((await sets()).every((s) => s.pain_flag)).toBe(true));
 
     now = "2026-11-08T11:00:00.000Z";
+    // Sets still open: the dock asks first (no modal), then finishes.
     fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+    const ask = await screen.findByRole("group", { name: "Finish early" });
+    expect((await sessions())[0]!.ended_at).toBeNull();
+    fireEvent.click(within(ask).getByRole("button", { name: "Finish" }));
     expect(await screen.findByText("Session A done.")).toBeTruthy();
     expect((await sessions())[0]!.ended_at).not.toBeNull();
     expect(window.sessionStorage.getItem("gym.today.rest")).toBeNull();
@@ -160,6 +164,32 @@ describe("Today · during and after a session", () => {
     expect(screen.getByRole("button", { name: "See today's summary" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Start cardio" })).toBeTruthy();
     expect(screen.queryByRole("article", { name: "Back squat" })).toBeNull();
+  });
+
+  it("a stray Finish tap with sets open asks inline; Keep going keeps the session running", async () => {
+    await startWithOneSet();
+    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+    const ask = await screen.findByRole("group", { name: "Finish early" });
+    expect(within(ask).getByText(/Finish with 1 of \d+ sets\?/)).toBeTruthy();
+    fireEvent.click(within(ask).getByRole("button", { name: "Keep going" }));
+    expect(screen.queryByRole("group", { name: "Finish early" })).toBeNull();
+    // Still logging: nothing ended, the next set is ready.
+    expect((await sessions())[0]!.ended_at).toBeNull();
+    expect(screen.getByText(/In progress/)).toBeTruthy();
+    expect(within(screen.getByRole("article", { name: "Back squat" })).getByRole("button", { name: "Confirm set 2" })).toBeTruthy();
+  });
+
+  it("a set logged by mistake is removed from its editor", async () => {
+    await startWithOneSet();
+    const squat = screen.getByRole("article", { name: "Back squat" });
+    fireEvent.click(within(squat).getByRole("button", { name: "Edit set 1" }));
+    fireEvent.click(within(squat).getByRole("button", { name: "Remove set" }));
+    await waitFor(async () => expect(await sets()).toHaveLength(0));
+    expect((await db.set_log.toArray()).every((s) => s.deleted_at != null)).toBe(true);
+    expect(await within(squat).findByText("0/2")).toBeTruthy();
+    // The slot is open again and can be logged.
+    fireEvent.click(within(squat).getByRole("button", { name: "Confirm set 1" }));
+    await waitFor(async () => expect(await sets()).toHaveLength(1));
   });
 
   it("discard asks inline and removes the session", async () => {

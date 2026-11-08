@@ -8,7 +8,7 @@ import { buildCardio } from "./cardio";
 import { buildFlags, buildNudges, planModifiers, readinessFor, readinessResult, recommendVersion, spacing } from "./events";
 import { buildPlan } from "./planning";
 import { statsOut, trackOut } from "./progression";
-import { totals, weekVolumes } from "./volume";
+import { programWeekVolume, totals, weekVolumes } from "./volume";
 import { zeroWeekDecisions } from "./weeks";
 
 export function buildNext(an: Analysis): { next: NextSession; decision: Decision } {
@@ -109,7 +109,7 @@ export function computeState(ctx: EngineContext): EngineState {
     readiness: readinessResult(rc, readinessAdj?.text ?? null),
     nudges: buildNudges(an, next, mods),
     warnings: spacing(an, next.code, "hard"),
-    flags: buildFlags(an, volume),
+    flags: buildFlags(an, volume, (tw) => programWeekVolume(an, tw)),
     tracks,
     stats,
     decisions,

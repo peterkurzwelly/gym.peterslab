@@ -35,6 +35,8 @@ export interface SetRowProps {
   /** Editor start weight when calibrating with nothing picked yet. */
   startWeight?: number;
   onConfirm: (values: SetValues) => void;
+  /** Removes the logged set (done rows only): a quiet "Remove set" in the editor. */
+  onRemove?: () => void;
   /** Start in the editing state (Kit preview). */
   defaultEditing?: boolean;
   className?: string;
@@ -86,7 +88,7 @@ export function SetFigure({ weight, reps, rir, ex, muted, small }: { weight: num
   );
 }
 
-export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight, startWeight, onConfirm, defaultEditing, className }: SetRowProps) {
+export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight, startWeight, onConfirm, onRemove, defaultEditing, className }: SetRowProps) {
   const targetWeight = set.weight ?? fallbackWeight ?? null;
   const initialDraft = (): SetValues =>
     logged ? { ...logged } : { weight: targetWeight ?? startWeight ?? calibrationStartWeight(ex, false), reps: set.reps, rir: set.rir };
@@ -107,7 +109,12 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
   const isTop = set.kind === "top";
   const done = logged != null;
   const repStep = ex.measure === "reps" ? 1 : 5;
-  const loadVisible = !(ex.bodyweight && ex.measure !== "reps");
+  // Timed or distance bodyweight work (plank) leads with the amount; added load stays one stepper away,
+  // so "add load" advice from the engine can be followed (a plate on the back).
+  const amountFirst = ex.bodyweight && ex.measure !== "reps";
+  // A calibration set has no target weight until one is picked: it reads "aim 8 @ 3", never "target pick".
+  const calibrating = set.weight == null;
+  const targetWord = calibrating && targetWeight == null ? "aim" : "target";
 
   const openEditor = () => {
     setDraft(initialDraft());
@@ -122,6 +129,30 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
 
   const setLabel = isTop ? "Top set" : `Set ${n}`;
 
+  const weightStepper = (
+    <Stepper
+      label={ex.bodyweight ? "Added" : "Weight"}
+      value={draft.weight}
+      step={ex.increment_kg}
+      min={0}
+      onChange={(weight) => setDraft((d) => ({ ...d, weight }))}
+      format={(v) => (ex.bodyweight ? fmtLoad(v, { bodyweight: true }) : fmtKg(v))}
+      unit={ex.bodyweight ? undefined : ex.per_hand ? "kg/hand" : "kg"}
+      inputMode="decimal"
+    />
+  );
+  const amountStepper = (
+    <Stepper
+      label={ex.measure === "seconds" ? "Seconds" : ex.measure === "meters" ? "Meters" : "Reps"}
+      value={draft.reps}
+      step={repStep}
+      min={0}
+      onChange={(reps) => setDraft((d) => ({ ...d, reps: Math.round(reps) }))}
+      unit={ex.measure === "seconds" ? "s" : ex.measure === "meters" ? "m" : ex.per_side ? sideSuffix(ex) : undefined}
+      inputMode="numeric"
+    />
+  );
+
   if (editing) {
     return (
       <div
@@ -133,34 +164,16 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
         <div className="flex min-h-11 items-center gap-2">
           <span className="shrink-0 whitespace-nowrap text-[11px] uppercase tracking-[0.14em] text-paper-faint">{setLabel}</span>
           <span className="min-w-0 truncate text-[12px] tabular-nums text-paper-faint">
-            · target {describeShort({ weight: targetWeight, reps: set.reps, rir: set.rir }, ex)}
+            · {targetWord} {describeShort({ weight: targetWeight, reps: set.reps, rir: set.rir }, ex)}
           </span>
           <button type="button" aria-label="Cancel editing" onClick={() => setEditing(false)} className="ml-auto grid h-11 w-11 place-items-center rounded-[3px] text-paper-dim active:bg-ink-3">
             <CloseIcon size={20} />
           </button>
         </div>
         <div className="flex flex-col gap-2.5">
-          {loadVisible && (
-            <Stepper
-              label={ex.bodyweight ? "Added" : "Weight"}
-              value={draft.weight}
-              step={ex.increment_kg}
-              min={0}
-              onChange={(weight) => setDraft((d) => ({ ...d, weight }))}
-              format={(v) => (ex.bodyweight ? fmtLoad(v, { bodyweight: true }) : fmtKg(v))}
-              unit={ex.bodyweight ? undefined : ex.per_hand ? "kg/hand" : "kg"}
-              inputMode="decimal"
-            />
-          )}
-          <Stepper
-            label={ex.measure === "seconds" ? "Seconds" : ex.measure === "meters" ? "Meters" : "Reps"}
-            value={draft.reps}
-            step={repStep}
-            min={0}
-            onChange={(reps) => setDraft((d) => ({ ...d, reps: Math.round(reps) }))}
-            unit={ex.measure === "seconds" ? "s" : ex.measure === "meters" ? "m" : ex.per_side ? sideSuffix(ex) : undefined}
-            inputMode="numeric"
-          />
+          {!amountFirst && weightStepper}
+          {amountStepper}
+          {amountFirst && weightStepper}
           {/* Label above so five chips get the full width (≥ 44 px each at 375 px). */}
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] uppercase tracking-[0.14em] text-paper-faint">RIR · reps left in the tank</span>
@@ -179,6 +192,18 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
           >
             Done
           </Button>
+          {done && onRemove && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(false);
+                onRemove();
+              }}
+              className="min-h-11 self-center px-3 font-mono text-[12px] uppercase tracking-[0.1em] text-paper-dim active:text-paper"
+            >
+              Remove set
+            </button>
+          )}
         </div>
       </div>
     );
@@ -186,6 +211,7 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
 
   // A calibration set has no target weight: any picked weight matches it, only reps and RIR can differ.
   const differs = done && ((targetWeight != null && logged.weight !== targetWeight) || logged.reps !== set.reps || logged.rir !== set.rir);
+
   const lastLine = last ? `last ${describeShort(last, ex)}` : null;
 
   return (
@@ -209,7 +235,11 @@ export function SetRow({ set, exercise: ex, logged, isNext, last, fallbackWeight
         )}
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-none text-paper-faint">
           {isTop && <Badge tone="outline">Top set</Badge>}
-          {differs && <span>target {describeShort({ weight: targetWeight, reps: set.reps, rir: set.rir }, ex)}</span>}
+          {differs && (
+            <span>
+              {targetWord} {describeShort({ weight: targetWeight, reps: set.reps, rir: set.rir }, ex)}
+            </span>
+          )}
           {!differs && lastLine && <span>{lastLine}</span>}
           {!done && set.weight == null && fallbackWeight != null && <span>as picked</span>}
         </span>

@@ -7,6 +7,9 @@ import { checkinAverage } from "./context";
 import { daysBetween, weekStart } from "./dates";
 import { fractionalSets, round2 } from "./calc";
 import { phaseForWeek } from "./phases";
+import { rotationOf } from "./analysis";
+import { deloadSets, phaseSets } from "./planning";
+import { weekIndexOf } from "./weeks";
 
 /** WHO moderate equivalent minutes of one log: easy minutes, or hard × multiplier + the rest. */
 export function whoMinutes(n: Norm, c: CardioLog): number {
@@ -42,6 +45,7 @@ export function weekVolumes(an: Analysis): WeekVolume[] {
       checkin_avg: null,
     };
   });
+  // Check-ins go by calendar week; activity in the week before the block counts toward week 1 (D18).
   const indexOf = (date: string) => daysBetween(n.blockMonday, weekStart(date)) / 7;
 
   // Finished and in progress sessions alike.
@@ -56,7 +60,10 @@ export function weekVolumes(an: Analysis): WeekVolume[] {
     }
   }
   for (const c of n.cardioLogs) {
-    const vol = out[indexOf(c.date)];
+    // A session's cardio belongs to the session's week (its local start date), like the session counts do,
+    // even when it was saved after midnight. Session-less walks go by their own date.
+    const s = c.session_id ? n.sessionById.get(c.session_id) : undefined;
+    const vol = s ? out[s.weekIndex] : out[weekIndexOf(n, c.date)];
     if (vol) vol.who_minutes += whoMinutes(n, c);
   }
   const ck = new Map<number, number[]>();
@@ -73,6 +80,28 @@ export function weekVolumes(an: Analysis): WeekVolume[] {
     const arr = ck.get(i);
     vol.checkin_avg = arr ? round2(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
   });
+  return out;
+}
+
+/**
+ * Fractional sets per tracked muscle that the program as written plans for a training week: strength_target sessions
+ * in rotation order, default exercises, phase (or deload) sets. Volume flags compare against it (ENGINE_RULES 7).
+ */
+export function programWeekVolume(an: Analysis, tw: number): Partial<Record<Muscle, number>> {
+  const { n, rp } = an;
+  const phase = phaseForWeek(n.program, n.config, tw, rp.deloadWeeks);
+  const rotation = rotationOf(n);
+  const out: Partial<Record<Muscle, number>> = {};
+  for (let i = 0; i < n.config.week.strength_target && rotation.length; i++) {
+    const day = n.dayByCode.get(rotation[i % rotation.length]!);
+    for (const p of day?.prescriptions ?? []) {
+      const ex = n.exercises[p.exercise_id];
+      if (!ex) continue;
+      const sets = phase.name === "deload" ? deloadSets(n, p, tw) : phaseSets(n, p, phase, tw);
+      for (const [m, f] of Object.entries(fractionalSets(ex, n.config))) out[m as Muscle] = (out[m as Muscle] ?? 0) + f * sets;
+    }
+  }
+  for (const m of Object.keys(out) as Muscle[]) out[m] = round2(out[m] ?? 0);
   return out;
 }
 

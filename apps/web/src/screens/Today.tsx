@@ -22,9 +22,10 @@ import {
   type CheckinScores,
 } from "../components";
 import { saveCheckin, startCardioSession, startSession, useCheckin, useEngine, usePlan, useSettings } from "../data";
+import { markSessionOpen } from "../lib/updatePolicy";
 import { CardioPanel } from "./today/CardioPanel";
 import { EngineError, TodaySkeleton } from "./today/Calm";
-import { PlanHeading, RecommendNote, SessionHeader, WeekStrip, sessionTitle } from "./today/parts";
+import { CheckinPrompt, PlanHeading, RecommendNote, SessionHeader, WeekStrip, sessionTitle } from "./today/parts";
 import { StrengthSession } from "./today/StrengthSession";
 import { readCheckinSkip, readPreChoice, writeCheckinSkip, writePreChoice, type PreChoice } from "./today/storage";
 
@@ -36,6 +37,12 @@ export function TodayScreen() {
   return <TodayReady state={state} ctx={ctx} settings={settings ?? null} />;
 }
 
+/**
+ * Break nudges only say that loads are eased (the plan and its banner already carry it). Their engine action
+ * is the full session, which would override a ★ 30 min recommendation at exactly the comeback moment.
+ */
+const INFO_ONLY: ReadonlySet<Nudge["kind"]> = new Set(["break_resume", "long_break"]);
+
 /** Nudges without a session action link to where they are acted on. */
 const NUDGE_LINKS: Partial<Record<Nudge["kind"], { label: string; to: string }>> = {
   book_floor: { label: "Book them", to: "/plan" },
@@ -43,13 +50,18 @@ const NUDGE_LINKS: Partial<Record<Nudge["kind"], { label: string; to: string }>>
   block_complete: { label: "See the block", to: "/plan" },
 };
 
-function scrollToExercises() {
+function scrollToId(id: string, block: ScrollLogicalPosition = "start") {
   window.setTimeout(() => {
-    const el = document.getElementById("today-exercises");
+    const el = document.getElementById(id);
     if (!el || typeof el.scrollIntoView !== "function") return;
     el.style.scrollMarginTop = "56px";
-    el.scrollIntoView({ block: "start", behavior: "smooth" });
+    el.style.scrollMarginBottom = "calc(var(--shell-bottom, 160px) + 8px)";
+    el.scrollIntoView({ block, behavior: "smooth" });
   }, 40);
+}
+
+function scrollToExercises() {
+  scrollToId("today-exercises");
 }
 
 function TodayReady({ state, ctx, settings }: { state: EngineState; ctx: EngineContext; settings: Settings | null }) {
@@ -66,6 +78,9 @@ function TodayReady({ state, ctx, settings }: { state: EngineState; ctx: EngineC
   const active = state.active?.session ?? null;
   const activeStrength = active && active.program_day_id !== "CARDIO" ? active : null;
   const activeCardio = active && active.program_day_id === "CARDIO" ? active : null;
+  // Tells the service worker update code that a session is open: no reload onto a new version mid-workout.
+  const activeId = active?.id ?? null;
+  useEffect(() => markSessionOpen(activeId), [activeId]);
 
   // ---- choices before the first set: version and swaps (local, survive a reload this visit) ----
   const blank = (): PreChoice => ({ date: state.today, code: next.code, mode: null, swaps: {} });
@@ -124,6 +139,9 @@ function TodayReady({ state, ctx, settings }: { state: EngineState; ctx: EngineC
   // ---- check-in ----
   const checkin = useCheckin(state.today);
   const [skippedFor, setSkippedFor] = useState<string | null>(() => (readCheckinSkip(state.today) ? state.today : null));
+  // Not checked in yet: the dock says so before the first set, since the card sits below the fold and a
+  // check-in saved before the session starts is the one that adjusts it (readiness flags at start).
+  const checkinPending = checkin === null && skippedFor !== state.today;
   const checkinValue: CheckinScores | null = checkin ? { sleep: checkin.sleep, soreness: checkin.soreness, stress: checkin.stress, energy: checkin.energy } : null;
 
   // ---- done for today: link to today's summary ----
@@ -139,7 +157,7 @@ function TodayReady({ state, ctx, settings }: { state: EngineState; ctx: EngineC
   const onNudge = (n: Nudge) => {
     const link = NUDGE_LINKS[n.kind];
     if (link) return navigate(link.to);
-    if (!n.action) return;
+    if (!n.action || INFO_ONLY.has(n.kind)) return;
     const mode: SessionMode = n.action.code === "TRAVEL" ? "travel" : n.action.mode;
     updateChoice({ mode });
     scrollToExercises();
@@ -171,7 +189,7 @@ function TodayReady({ state, ctx, settings }: { state: EngineState; ctx: EngineC
         {/* 2 · nudges */}
         {nudges.map((n) => {
           const link = NUDGE_LINKS[n.kind];
-          const sessionAction = !!n.action && !next.done_today;
+          const sessionAction = !!n.action && !next.done_today && !INFO_ONLY.has(n.kind);
           return <NudgeCard key={`${n.rule_id}:${n.kind}`} nudge={n} actionLabel={link?.label} onAction={link || sessionAction ? onNudge : undefined} />;
         })}
 
@@ -215,16 +233,18 @@ function TodayReady({ state, ctx, settings }: { state: EngineState; ctx: EngineC
 
         {/* 4 · check-in */}
         {!inSession && !showCardio && checkin !== undefined && (
-          <CheckinCard
-            key={state.today}
-            value={checkinValue}
-            skipped={skippedFor === state.today}
-            onSave={(scores) => void saveCheckin({ date: state.today, ...scores }).catch((e) => console.warn("[today] check-in", e))}
-            onSkip={() => {
-              setSkippedFor(state.today);
-              writeCheckinSkip(state.today);
-            }}
-          />
+          <div id="today-checkin">
+            <CheckinCard
+              key={state.today}
+              value={checkinValue}
+              skipped={skippedFor === state.today}
+              onSave={(scores) => void saveCheckin({ date: state.today, ...scores }).catch((e) => console.warn("[today] check-in", e))}
+              onSkip={() => {
+                setSkippedFor(state.today);
+                writeCheckinSkip(state.today);
+              }}
+            />
+          </div>
         )}
 
         {/* 5 · what changed today */}
@@ -267,6 +287,7 @@ function TodayReady({ state, ctx, settings }: { state: EngineState; ctx: EngineC
               blockSwaps={ctx.settings.block_swaps}
               sound={sound}
               onFinished={(id) => navigate(`/summary/${id}`)}
+              dockPrompt={checkinPending ? <CheckinPrompt onOpen={() => scrollToId("today-checkin", "center")} /> : null}
             />
           </div>
         )}

@@ -12,14 +12,18 @@ const CAPTION: Record<Nudge["kind"], string> = {
   block_complete: "Week 12",
 };
 
-/** Default button text from the suggested action. */
-function actionText(n: Nudge): string | null {
+/**
+ * Default button text from the suggested action. "Show", not "Start": the button picks the version and
+ * scrolls to it; the session starts with the first logged set.
+ */
+export function nudgeActionText(n: Nudge): string | null {
   if (!n.action) return null;
   const { mode, code } = n.action;
-  if (mode === "short") return `Start ★ 30 min ${code}`;
-  if (code === "TRAVEL") return "Start travel version";
-  if (code === "CARDIO") return "Start cardio";
-  return `Start session ${code}`;
+  if (mode === "short") return `Show ★ 30 min ${code}`;
+  if (code === "TRAVEL") return "Show travel version";
+  if (code === "CARDIO") return "Show cardio";
+  if (mode === "comeback") return `Show comeback session ${code}`;
+  return `Show session ${code}`;
 }
 
 export interface NudgeCardProps {
@@ -31,7 +35,7 @@ export interface NudgeCardProps {
 }
 
 export function NudgeCard({ nudge, onAction, actionLabel, className }: NudgeCardProps) {
-  const label = actionLabel ?? actionText(nudge);
+  const label = actionLabel ?? nudgeActionText(nudge);
   return (
     <aside className={cx("rounded-[3px] border border-line bg-ink-2/50 px-4 py-3", className)}>
       <div className="text-[11px] uppercase tracking-[0.14em] text-paper-faint">{CAPTION[nudge.kind]}</div>

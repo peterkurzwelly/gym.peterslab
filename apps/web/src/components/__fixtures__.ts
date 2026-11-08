@@ -497,7 +497,7 @@ export const nudgeBlockComplete: Nudge = {
   action: null,
 };
 
-export const readinessAdjustments: Adjustment[] = [{ rule_id: "event.readiness", text: "Sleep 2/5: Back squat −7.5%, 1 set dropped per exercise." }];
+export const readinessAdjustments: Adjustment[] = [{ rule_id: "event.readiness", text: "Sleep 2/5: Back squat 65 → 60 kg, 1 set dropped per exercise." }];
 
 export const spacingWarnings: SpacingWarning[] = [
   { rule_id: "spacing.consecutive_strength", text: "This would be strength 3 days in a row. Fine if you feel fresh." },

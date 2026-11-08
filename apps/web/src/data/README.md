@@ -119,6 +119,10 @@ await setSyncKey(pastedKey);     // Settings: stored on this device only, sent a
 - `auth_required`: no or wrong sync key (401/403), or an expired Cloudflare Access session (redirect). Show "Add your sync key in Settings" (`lastError` has the text).
 - `offline`: rows wait in the outbox; nothing is lost. Show it quietly, never as a failure.
 - Triggers: start, back online, app visible / hidden (flush with keepalive), 2 s after writes, every 60 s while visible, after `finishSession`. `error` (5xx) retries with backoff.
+- Rows the server refuses (or this bundle cannot validate) stay in the outbox and are retried once per sync; `lastError` says "N changes could not be saved on the server" until they go through.
+- Pulled rows keep fields this bundle does not know, and rewrites keep them, so an older bundle never pushes a row back without them. A pulled row this bundle cannot parse waits in meta `quarantine` and lands after the app updates; the rest of the page applies.
+- `reset: true` from the server (database recreated, wiped or restored) queues every local row, soft-deleted ones included, and pushes them in the same sync.
+- Settings: `ensureSettings()` (boot, `useEngine`) seeds the defaults locally with `updated_at` 1970 and does not queue them, so a fresh device never overwrites the real settings on the server. The first pull replaces the seed; the first `updateSettings` is stamped now and synced. An edit made before the first pull still pushes a whole row built on the defaults, so paste the sync key before changing settings on a new device.
 
 ## Export / import
 

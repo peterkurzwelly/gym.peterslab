@@ -41,6 +41,12 @@ describe("D1 schema matches @gym/schema", () => {
     expect(typeof row!.value).toBe("number");
   });
 
+  it("sync_meta holds a random epoch (migration 0003)", async () => {
+    const row = await env.DB.prepare(`SELECT value FROM sync_meta WHERE key = 'epoch'`).first<{ value: number }>();
+    expect(Number.isSafeInteger(row!.value)).toBe(true);
+    expect(row!.value).toBeGreaterThanOrEqual(0);
+  });
+
   it("column kinds follow the storage rules", () => {
     const kind = (t: (typeof SYNC_TABLES)[number], name: string) => TABLE_COLUMNS[t].find((c) => c.name === name);
     expect(kind("set_log", "is_warmup")).toMatchObject({ kind: "boolean", nullable: false });

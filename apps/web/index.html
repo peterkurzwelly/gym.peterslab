@@ -21,16 +21,10 @@
     <script type="module" src="/src/main.tsx"></script>
     <script type="module">
       // Service worker: the app shell works offline. A new version installs in the background
-      // (registerType autoUpdate) and the page reloads onto it only at an app open, before the
-      // first tap. Never while Peter is logging. Dexie (IndexedDB) is untouched by a reload.
+      // (registerType autoUpdate) and the page reloads onto it only at an app open, before the first
+      // tap, and never while a session is open (src/lib/updatePolicy.ts). Dexie is untouched by a reload.
       import { registerSW } from "virtual:pwa-register";
-
-      const OPEN_AFTER_HIDDEN_MS = 30_000;
-      const CHECK_EVERY_MS = 5 * 60_000;
-      let touched = false;
-      let pendingReload = false;
-      let hiddenAt = 0;
-      let lastCheck = Date.now();
+      import { createUpdatePolicy } from "/src/lib/updatePolicy.ts";
 
       const reload = () => {
         // Guard against a reload loop if something keeps failing.
@@ -42,8 +36,14 @@
         location.reload();
       };
 
-      addEventListener("pointerdown", () => (touched = true), { capture: true, passive: true });
-      addEventListener("keydown", () => (touched = true), { capture: true });
+      let registration = null;
+      const policy = createUpdatePolicy({
+        reload,
+        update: () => registration?.update().catch(() => {}),
+      });
+
+      addEventListener("pointerdown", () => policy.touch(), { capture: true, passive: true });
+      addEventListener("keydown", () => policy.touch(), { capture: true });
 
       // An old page lazily loading a chunk the new version removed: reload onto the new version.
       const staleChunk = (msg) => /dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(msg || ""));
@@ -60,26 +60,14 @@
 
       registerSW({
         immediate: true,
-        // A new version is active. Reload now if Peter has not tapped since opening, else at the next open.
-        onNeedReload() {
-          if (!touched) reload();
-          else pendingReload = true;
-        },
-        onRegisteredSW(_url, registration) {
-          if (!registration) return;
+        // A new version is active. Reload now at an untouched app open, else at the next open after the session.
+        onNeedReload: () => policy.needReload(),
+        onRegisteredSW(_url, reg) {
+          if (!reg) return;
+          registration = reg;
           document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "hidden") {
-              hiddenAt = Date.now();
-              return;
-            }
-            // Back from the background after a while: that is an app open.
-            if (!hiddenAt || Date.now() - hiddenAt < OPEN_AFTER_HIDDEN_MS) return;
-            touched = false;
-            if (pendingReload) return reload();
-            if (Date.now() - lastCheck > CHECK_EVERY_MS && navigator.onLine !== false) {
-              lastCheck = Date.now();
-              registration.update().catch(() => {});
-            }
+            if (document.visibilityState === "hidden") policy.hidden();
+            else policy.visible();
           });
         },
       });

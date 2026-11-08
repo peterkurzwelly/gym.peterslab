@@ -25,7 +25,10 @@ function findPrescription(ctx: EngineContext, id: string): Prescription | undefi
   return undefined;
 }
 
-/** Program exercise first, then the listed alternatives (with their allowed state). */
+/**
+ * Program exercise first, then the listed alternatives (with their allowed state). The exercise in use is
+ * always in the list: the engine leaves it out of `alternatives`, so after a block swap it is added back here.
+ */
 export function swapOptions(ex: PlannedExercise, ctx: EngineContext): SwapOption[] {
   const p = findPrescription(ctx, ex.prescription_id);
   const primary: SwapOption = {
@@ -38,7 +41,12 @@ export function swapOptions(ex: PlannedExercise, ctx: EngineContext): SwapOption
     reason: ex.swapped === "limitation" ? "Set aside for your limitations." : null,
     primary: true,
   };
-  return [primary, ...ex.alternatives.filter((a) => a.exercise_id !== primary.exercise_id).map((a) => ({ ...a, primary: false }))];
+  const alternatives = ex.alternatives.filter((a) => a.exercise_id !== primary.exercise_id).map((a) => ({ ...a, primary: false }));
+  const current: SwapOption[] =
+    ex.exercise_id !== primary.exercise_id && !alternatives.some((a) => a.exercise_id === ex.exercise_id)
+      ? [{ exercise_id: ex.exercise_id, name: ex.name, rep_min: ex.rep_min, rep_max: ex.rep_max, measure: ex.measure, allowed: true, reason: null, primary: false }]
+      : [];
+  return [primary, ...current, ...alternatives];
 }
 
 function safePlan(ctx: EngineContext, code: StrengthDayCode): SessionPlan | null {

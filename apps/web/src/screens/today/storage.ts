@@ -76,3 +76,27 @@ export function readCardioModality(): string | null {
 export function writeCardioModality(m: string): void {
   writeJson("local", MODALITY_KEY, m);
 }
+
+// ---------- interval timer run, kept across a remount or reload of the cardio panel ----------
+
+const INTERVAL_KEY = "gym.today.interval";
+
+export interface StoredIntervalRun {
+  sessionId: string;
+  startedAt: number;
+  pausedAt: number | null;
+  pausedMs: number;
+  finished?: { minutes: number; hardMinutes: number } | null;
+}
+
+/** The stored timer run for this cardio session, or null. */
+export function readIntervalRun(sessionId: string | null | undefined): StoredIntervalRun | null {
+  if (!sessionId) return null;
+  const v = readJson<StoredIntervalRun>("session", INTERVAL_KEY);
+  return v && v.sessionId === sessionId && typeof v.startedAt === "number" ? v : null;
+}
+
+/** Stores the run for this session; null (or no session) forgets it. */
+export function writeIntervalRun(sessionId: string | null | undefined, run: Omit<StoredIntervalRun, "sessionId"> | null): void {
+  writeJson("session", INTERVAL_KEY, sessionId && run ? { ...run, sessionId } : null);
+}

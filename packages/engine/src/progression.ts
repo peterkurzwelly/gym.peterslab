@@ -16,6 +16,7 @@ import { lastZeroWeekBefore } from "./weeks";
 import { amount, fmtNum, fmtPct, signedKg, timesWord } from "./text";
 
 export interface TrackInternal extends TrackState {
+  /** Per exposure: below range with added load on a double progression track (the reactive deload missed reps criterion). */
   belowHistory: boolean[];
   allBelowHistory: boolean[];
   pain_last: boolean;
@@ -234,6 +235,19 @@ function evaluate(n: Norm, ev: EvalIn): EvalOut {
   // Double progression.
   const reset = n.config.progression.reset;
   const needBefore = reset.consecutive_below - 1;
+  if (below && track.below_range_streak >= needBefore && load <= 0) {
+    // Bodyweight with no added load: there is nothing to take off, so aim for the bottom of the range and point at
+    // an easier alternative instead of a "reset to 0 kg" that changes nothing.
+    const alt = easierAlternative(n, slot);
+    const tail = alt ? `, or try ${alt} for now` : ", or pick an easier variation for now";
+    return out(
+      "dp.bodyweight_hold",
+      0,
+      repMin,
+      `Below range at bodyweight ${timesWord(reset.consecutive_below)}: aim for ${amount(repMin, measure)}${tail}.`,
+      `${name}: below range at bodyweight, aim for ${amount(repMin, measure)}${tail}.`,
+    );
+  }
   if (below && track.below_range_streak >= needBefore) {
     const prevAll = needBefore > 0 ? track.allBelowHistory.slice(-needBefore) : [];
     const everyBelow = allBelow && prevAll.length >= needBefore && prevAll.every(Boolean);
@@ -284,6 +298,13 @@ function evaluate(n: Norm, ev: EvalIn): EvalOut {
     return out("dp.hold_rir", load, repMax, "Top of range but harder than planned: same load.", `${name}: top of range but harder than planned, same weight.`);
   }
   return out("dp.hold_add_reps", load, holdReps, "Within range: same load, add reps.", `${name}: same weight, aim for ${amount(holdReps, measure)} on every set.`);
+}
+
+/** Name of an easier option for a bodyweight slot: the first alternative with load to adjust, else the first one. */
+function easierAlternative(n: Norm, slot: Slot): string | null {
+  const alts = slot.prescription.alternatives.map((a) => n.exercises[a.exercise_id]).filter((ex): ex is Exercise => !!ex && ex.id !== slot.exercise_id);
+  const pick = alts.find((ex) => !isBodyweight(ex)) ?? alts[0];
+  return pick?.name ?? null;
 }
 
 const HOLD_TEXT: Record<string, string> = {
@@ -514,11 +535,16 @@ export function replay(n: Norm, wc: WeeksCalc): Replay {
             st.best = stored;
             st.bestIdx = st.history.length - 1;
           }
-          if (st.first == null && s.date >= n.blockStart) st.first = stored;
+          // First e1RM of the block: any session in a block week (week 1 includes the week before, D18).
+          if (st.first == null && s.weekIndex >= 0) st.first = stored;
         }
         e1rmInfo.set(exId, { raw, stored });
-        const value = stored ?? raw;
-        if (prevBest != null && value > prevBest) sessionPrs.push({ exercise_id: exId, e1rm: value, previous_best: prevBest });
+        // PRs only from values that update the best (progression eligible), so a hold session never reports one that
+        // the next session reports again. Bodyweight e1RM is added load only: kept for trends, not listed as a PR.
+        const ex = n.exercises[exId];
+        if (stored != null && prevBest != null && stored > prevBest && !(ex && isBodyweight(ex))) {
+          sessionPrs.push({ exercise_id: exId, e1rm: stored, previous_best: prevBest });
+        }
       }
       if (sessionPrs.length) prs.set(s.id, sessionPrs);
 
@@ -637,7 +663,9 @@ export function replay(n: Norm, wc: WeeksCalc): Replay {
         t.base_weight = ev.weight;
         t.base_reps = ev.reps;
         t.exposures += 1;
-        t.belowHistory.push(ev.below);
+        // Below range at bodyweight (no added load) or on a reps only track says more about the variation than about
+        // fatigue, so it does not count toward the reactive deload missed reps criterion.
+        t.belowHistory.push(ev.below && slot.progression_rule === "double" && Math.max(...work.map((y) => y.log.weight)) > 0);
         t.allBelowHistory.push(ev.allBelow);
         t.below_range_streak = ev.rule_id === "dp.reset" ? 0 : ev.below ? t.below_range_streak + 1 : 0;
         t.last_rule_id = ev.rule_id;

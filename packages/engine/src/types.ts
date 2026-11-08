@@ -99,7 +99,7 @@ export interface BlockState {
   phase: PhaseName;
   phase_label: string;
   complete: boolean;
-  /** Calendar weeks added because of zero weeks. */
+  /** Calendar weeks the block runs longer than planned: zero weeks plus weeks a long break restart took back. */
   extension_weeks: number;
   /** 12 dots, one per training week. */
   dots: DotState[];

@@ -2,6 +2,7 @@ import type { SessionChange, SessionSummary } from "@gym/engine";
 import type { ReactNode } from "react";
 import { cx } from "../lib/cx";
 import { fmtAmount, fmtInt, fmtKg, fmtKgDelta, fmtLoad, fmtMinutes, type AmountShape, type LoadShape } from "../lib/format";
+import { ShellDock } from "./AppShell";
 import { Button } from "./Button";
 import { SectionHeader } from "./SectionHeader";
 import { WeekLine, type WeekGoals } from "./WeekCard";
@@ -16,6 +17,8 @@ export interface SummaryViewProps {
   detail?: ReactNode;
   /** Exercise shapes by id (ctx.exercises), so bodyweight and timed work read "45 s" instead of "0 kg × 45". */
   exercises?: Record<string, ExerciseShape>;
+  /** Put Done in the shell dock (bottom third) instead of under the content. */
+  docked?: boolean;
   className?: string;
 }
 
@@ -35,29 +38,48 @@ export function changeDelta(c: SessionChange): string {
   return changeDeltaFor(c);
 }
 
+/** A load with its unit: "25 kg", "10 kg/hand", "BW+5". Plain bodyweight (0) has no load to show: null. */
+export function loadText(weight: number, shape?: ExerciseShape): string | null {
+  if (weight <= 0) return null;
+  return shape?.bodyweight ? fmtLoad(weight, { bodyweight: true }) : `${fmtKg(weight)} kg${shape?.per_hand ? "/hand" : ""}`;
+}
+
+/** The first base of a track (after a calibration session): the old base had no weight. */
+export function isStartingLoad(c: Pick<SessionChange, "from" | "to">): boolean {
+  return (!c.from || c.from.weight == null) && c.to != null && c.to.weight != null;
+}
+
 /** changeDelta with the exercise's shape: "aim 45 s" for timed work. */
 export function changeDeltaFor(c: SessionChange, shape?: ExerciseShape): string {
   const { from, to } = c;
   if (!to) return "";
   if (from?.weight != null && to.weight != null && from.weight !== to.weight) return `${fmtKgDelta(to.weight - from.weight)} kg`;
   // After a calibration exposure the old base has no weight: show the new load, not "aim n".
-  if ((!from || from.weight == null) && to.weight != null && to.weight > 0) return `${fmtKg(to.weight)} kg${shape?.per_hand ? "/hand" : ""}`;
+  const start = isStartingLoad(c) ? loadText(to.weight!, shape) : null;
+  if (start) return start;
   if (from && to.reps !== from.reps) return `aim ${fmtAmount(to.reps, shape)}`;
   if (!from) return `aim ${fmtAmount(to.reps, shape)}`;
   return "same";
 }
 
-/** "Next: 62.5 kg × 8", "Next: 10 kg/hand × 12", "Next: BW+5 × 6", "Next: 45 s" (no load for plain bodyweight work). */
-export function changeNextLine(to: { weight: number | null; reps: number }, shape?: ExerciseShape): string {
+/**
+ * "Next: 62.5 kg × 8", "Next: 10 kg/hand × 12", "Next: BW+5 × 6", "Next: 45 s" (no load for plain bodyweight work).
+ * The first base after calibration reads "Start at 25 kg × 5 next time".
+ */
+export function changeNextLine(to: { weight: number | null; reps: number }, shape?: ExerciseShape, opts: { start?: boolean } = {}): string {
   const amount = fmtAmount(to.reps, shape);
-  const w = to.weight ?? 0;
-  if (w <= 0) return `Next: ${amount}`;
-  const load = shape?.bodyweight ? fmtLoad(w, shape) : `${fmtKg(w)} kg${shape?.per_hand ? "/hand" : ""}`;
-  return `Next: ${load} × ${amount}`;
+  const load = loadText(to.weight ?? 0, shape);
+  const what = load ? `${load} × ${amount}` : amount;
+  return opts.start ? `Start at ${what} next time` : `Next: ${what}`;
 }
 
-export function SummaryView({ summary, onDone, blockWeeks, goals, detail, exercises, className }: SummaryViewProps) {
+export function SummaryView({ summary, onDone, blockWeeks, goals, detail, exercises, docked, className }: SummaryViewProps) {
   const s = summary;
+  const done = (
+    <Button variant="primary" size="lg" block onClick={onDone} className={docked ? undefined : "mt-2"}>
+      Done
+    </Button>
+  );
   return (
     <div className={cx("flex flex-col gap-5", className)}>
       <header>
@@ -92,7 +114,7 @@ export function SummaryView({ summary, onDone, blockWeeks, goals, detail, exerci
                 </div>
                 <p className="mt-1 text-[13px] leading-snug text-paper-dim">{c.explanation}</p>
                 {c.to && c.to.weight != null && (
-                  <p className="mt-0.5 text-[12px] tabular-nums text-paper-faint">{changeNextLine(c.to, exercises?.[c.exercise_id])}</p>
+                  <p className="mt-0.5 text-[12px] tabular-nums text-paper-faint">{changeNextLine(c.to, exercises?.[c.exercise_id], { start: isStartingLoad(c) })}</p>
                 )}
               </li>
             ))}
@@ -117,9 +139,7 @@ export function SummaryView({ summary, onDone, blockWeeks, goals, detail, exerci
         </section>
       )}
 
-      <Button variant="primary" size="lg" block onClick={onDone} className="mt-2">
-        Done
-      </Button>
+      {docked ? <ShellDock>{done}</ShellDock> : done}
     </div>
   );
 }

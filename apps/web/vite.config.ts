@@ -21,7 +21,11 @@ function buildLabel(): string {
 
 // Icons: apps/web/scripts/generate-icons.mjs writes them into public/.
 // Updates: registerType autoUpdate (skipWaiting + clientsClaim). index.html registers the service worker
-// and reloads onto a new version only at an app open, never while Peter is tapping. Dexie is untouched.
+// and reloads onto a new version only at an app open, never while Peter is tapping or a session is open
+// (src/lib/updatePolicy.ts). Dexie is untouched.
+// public/sw-guard.js runs inside the service worker first: HTML served for a missing .js/.css file is a
+// 404 to the precache, so a deploy race cannot store index.html as the app's main chunk.
+// public/_headers: CSP and friends for the static assets.
 export default defineConfig({
   plugins: [
     react(),
@@ -60,6 +64,7 @@ export default defineConfig({
         // The exercise library and engine ship in the main chunk; keep it precached.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
+        importScripts: ["sw-guard.js"],
         clientsClaim: true,
         skipWaiting: true,
       },

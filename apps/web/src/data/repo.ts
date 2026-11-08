@@ -39,6 +39,16 @@ interface Writer {
   put<T extends SyncTable>(table: T, draft: Draft<T>): Promise<RowOf<T>>;
 }
 
+/**
+ * Fields a stored row carries that this bundle's schema does not know (pulled from a newer version of the app).
+ * They are kept when the row is rewritten, so an edit here never pushes the row back without them.
+ */
+function unknownFields(table: SyncTable, row: object | undefined): Record<string, unknown> {
+  if (!row) return {};
+  const known: object = TableSchemas[table].shape;
+  return Object.fromEntries(Object.entries(row).filter(([k]) => !(k in known)));
+}
+
 function makeWriter(now: string): Writer {
   return {
     now,
@@ -46,7 +56,8 @@ function makeWriter(now: string): Writer {
       const t = db.rows(table);
       const existing = await t.get(draft.id);
       const updated_at = nextUpdatedAt(existing?.updated_at, now);
-      const row = TableSchemas[table].parse({ ...draft, updated_at }) as RowOf<typeof table>;
+      const parsed = TableSchemas[table].parse({ ...draft, updated_at });
+      const row = { ...unknownFields(table, existing), ...parsed } as RowOf<typeof table>;
       await t.put(row);
       await db.outbox.add({ table, row_id: row.id, queued_at: now });
       return row;
@@ -75,15 +86,32 @@ async function requireRow<T extends SyncTable>(table: T, id: string): Promise<Ro
 
 // ---------------- settings ----------------
 
+/**
+ * updated_at of a settings row seeded from the defaults on this device. The seed is never queued, and any real row
+ * (server, another device) is newer, so the first pull replaces it. The first real edit gets updated_at = now.
+ */
+export const SETTINGS_SEED_AT = "1970-01-01T00:00:00.000Z";
+
 async function ensureSettingsIn(w: Writer): Promise<Settings> {
   const existing = await db.settings.get("settings");
   if (existing && !existing.deleted_at) return existing;
   const { config, program } = getDefaults();
-  const fresh = defaultSettings(config, program, w.now);
-  return w.put("settings", { ...fresh, id: "settings", deleted_at: null });
+  if (!existing) {
+    // A fresh device seeds before it can pull (the sync key is per device). LWW compares updated_at only, so a seed
+    // stamped now and pushed would replace Peter's real settings on the server and then on every device.
+    const seed = TableSchemas.settings.parse({
+      ...defaultSettings(config, program, SETTINGS_SEED_AT),
+      id: "settings",
+      deleted_at: null,
+    });
+    await db.settings.put(seed);
+    return seed;
+  }
+  // Soft deleted: bring it back as a normal write so the undelete syncs.
+  return w.put("settings", { ...defaultSettings(config, program, w.now), id: "settings", deleted_at: null });
 }
 
-/** Creates the settings row from engine defaults when missing. Returns the row. */
+/** Creates the settings row from engine defaults when missing (local only, see SETTINGS_SEED_AT). Returns the row. */
 export async function ensureSettings(): Promise<Settings> {
   const existing = await db.settings.get("settings");
   if (existing && !existing.deleted_at) return existing;

@@ -22,13 +22,18 @@ export interface RestTimerProps {
   onDone: () => void;
   /** Mirrors settings.sound. */
   sound?: boolean;
+  /**
+   * Beep, flash and vibrate at zero (default). Today passes false: an app wide watcher owns the alert there,
+   * so it also fires on the other tabs, and this bar only reports onDone.
+   */
+  alert?: boolean;
   className?: string;
 }
 
 /** Skip the alert if we only notice the end this late (app came back from the background). */
 const LATE_ALERT_MS = 3000;
 
-export function RestTimer({ startedAt, endsAt, label, onAdd, onSkip, onDone, sound = true, className }: RestTimerProps) {
+export function RestTimer({ startedAt, endsAt, label, onAdd, onSkip, onDone, sound = true, alert = true, className }: RestTimerProps) {
   const start = toMs(startedAt);
   const end = toMs(endsAt);
   const now = useNow(true, 250);
@@ -43,13 +48,13 @@ export function RestTimer({ startedAt, endsAt, label, onAdd, onSkip, onDone, sou
   useEffect(() => {
     if (now < end || firedFor.current === end) return;
     firedFor.current = end;
-    if (now - end < LATE_ALERT_MS) {
+    if (alert && now - end < LATE_ALERT_MS) {
       if (sound) beepLong();
       flashScreen();
       vibrate([250, 120, 250]);
     }
     onDoneRef.current();
-  }, [now, end, sound]);
+  }, [now, end, sound, alert]);
 
   return (
     <div

@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { SYNC_TABLES, type ExportFile, type SyncTable } from "@gym/schema";
 import { LooseTables, idsByTable, lwwWinners, serializeTables, validateTables, type Rejected } from "./rows";
-import { readAll, readLiveIdsExcept, readUpdatedAt, writeRows } from "./store";
+import { readAll, readLiveIdsExcept, readUpdatedAt, writeRows, type Row } from "./store";
 
 export async function buildExport(db: D1Database): Promise<ExportFile> {
   return {
@@ -32,7 +32,8 @@ export type ImportResult =
 /**
  * merge: last write wins, like a sync push.
  * replace: every live row whose id is not in the file is soft deleted (deleted_at = updated_at = now),
- * then every file row is written as is. Both get new revs, in one batch. Replace refuses a file with
+ * then every file row is written with updated_at = now, so it wins on the server and on every device.
+ * Both get new revs, in one batch. Replace refuses a file with
  * invalid rows instead of half applying a destructive restore.
  */
 export async function runImport(
@@ -48,11 +49,17 @@ export async function runImport(
     const stored = await readUpdatedAt(db, idsByTable(valid));
     result = await writeRows(db, { rows: serializeTables(lwwWinners(valid, stored)), mode: "lww" });
   } else {
+    // Every file row takes the import instant as updated_at, like the soft deletes, so it also wins on every device
+    // whose local copy is newer than the file (a device only applies strictly newer rows and never re-pushes them).
+    const at = new Date().toISOString();
     const toDelete = await readLiveIdsExcept(db, idsByTable(valid));
+    const stamped = Object.fromEntries(
+      SYNC_TABLES.map((t) => [t, valid[t].map((r): Row => ({ ...r, updated_at: at }))]),
+    ) as Record<SyncTable, Row[]>;
     result = await writeRows(db, {
-      rows: serializeTables(valid),
+      rows: serializeTables(stamped),
       mode: "force",
-      softDelete: { at: new Date().toISOString(), ids: toDelete },
+      softDelete: { at, ids: toDelete },
     });
   }
 

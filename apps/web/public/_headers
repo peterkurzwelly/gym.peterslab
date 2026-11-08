@@ -1,0 +1,8 @@
+# Security headers for the static assets (the PWA). Workers static assets apply this file to assets only;
+# /api responses are built by the Worker and keep their own headers (no-store, nosniff).
+# No inline scripts or styles ship in the build, fonts are self hosted, React sets styles through CSSOM.
+# Zod probes eval in a try/catch: expect one caught script-src report in the console, nothing breaks.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff

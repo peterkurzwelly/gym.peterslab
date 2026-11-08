@@ -121,6 +121,12 @@ describe("Plan · edits", () => {
     await waitFor(async () => expect((await db.settings.get("settings"))?.block_swaps).toEqual({ B3: "lat_pulldown" }));
     await screen.findByText("For the block");
 
+    // The open list still shows what is chosen: Lat pulldown checked, the program exercise one tap back.
+    const after = await screen.findByRole("radiogroup", { name: /Pull-up this block/ });
+    await waitFor(() => expect(within(after).getByRole("radio", { name: /^Lat pulldown/ }).getAttribute("aria-checked")).toBe("true"));
+    expect(within(after).getByRole("radio", { name: /Pull-up, program exercise/ }).getAttribute("aria-checked")).toBe("false");
+    expect(within(after).getAllByRole("radio").filter((r) => r.getAttribute("aria-checked") === "true")).toHaveLength(1);
+
     // Back to the program exercise removes the swap.
     fireEvent.click(screen.getByRole("radio", { name: /Pull-up, program exercise/ }));
     await waitFor(async () => expect((await db.settings.get("settings"))?.block_swaps).toEqual({}));

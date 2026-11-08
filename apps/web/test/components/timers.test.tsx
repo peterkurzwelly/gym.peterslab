@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell, ShellDock, ShellTitle } from "../../src/components/AppShell";
@@ -80,8 +80,40 @@ describe("FinishBar", () => {
     expect(screen.getByText("5 of 8 sets")).toBeTruthy();
     advance(5_000);
     expect(screen.getByText("2:10")).toBeTruthy();
+    // 5 of 8: the first tap asks inline, the second one finishes.
+    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+    expect(onFinish).not.toHaveBeenCalled();
+    const ask = screen.getByRole("group", { name: "Finish early" });
+    expect(within(ask).getByText(/Finish with 5 of 8 sets\?/)).toBeTruthy();
+    fireEvent.click(within(ask).getByRole("button", { name: "Finish" }));
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("finishes in one tap when every set is logged", () => {
+    const onFinish = vi.fn();
+    render(<FinishBar startedAt={T0} setsDone={8} setsTotal={8} onFinish={onFinish} />);
     fireEvent.click(screen.getByRole("button", { name: "Finish" }));
     expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("group", { name: "Finish early" })).toBeNull();
+  });
+
+  it("a stray tap with sets open is undone by Keep going, which sits where Finish was", () => {
+    const onFinish = vi.fn();
+    const { rerender } = render(<FinishBar startedAt={T0} setsDone={1} setsTotal={12} onFinish={onFinish} />);
+    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+    const ask = screen.getByRole("group", { name: "Finish early" });
+    expect(within(ask).getByText(/Finish with 1 of 12 sets\?/)).toBeTruthy();
+    const buttons = within(ask).getAllByRole("button").map((b) => b.textContent);
+    expect(buttons).toEqual(["Finish", "Keep going"]);
+    fireEvent.click(within(ask).getByRole("button", { name: "Keep going" }));
+    expect(onFinish).not.toHaveBeenCalled();
+    expect(screen.getByText("1 of 12 sets")).toBeTruthy();
+
+    // Logging another set closes an open question.
+    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+    rerender(<FinishBar startedAt={T0} setsDone={2} setsTotal={12} onFinish={onFinish} />);
+    expect(screen.queryByRole("group", { name: "Finish early" })).toBeNull();
+    expect(screen.getByText("2 of 12 sets")).toBeTruthy();
   });
 });
 
