@@ -1,0 +1,40 @@
+{
+  // One Worker for gym.peterslab.app: serves the PWA (apps/web/dist) and the
+  // sync API under /api (apps/api). Lab convention: one repo + Worker per app.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gym",
+  "main": "apps/api/src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gym",
+      "database_id": "REPLACE_WITH_D1_ID",
+      "migrations_dir": "apps/api/migrations"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "1701",
+      "simple": { "limit": 120, "period": 60 }
+    }
+  ],
+  "vars": {
+    // Cloudflare Access: set both to verify the Access JWT on /api.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+    // SYNC_TOKEN is a Worker secret (wrangler secret put SYNC_TOKEN), never here.
+  },
+  "observability": { "enabled": true },
+  "routes": [
+    { "pattern": "gym.peterslab.app", "custom_domain": true }
+  ]
+}

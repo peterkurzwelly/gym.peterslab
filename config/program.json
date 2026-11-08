@@ -1,0 +1,763 @@
+{
+  "id": "consistency-first-12w",
+  "name": "12-week program · Consistency first",
+  "version": 1,
+  "block_weeks": 12,
+  "default_start_date": "2026-11-09",
+  "rotation": [
+    "A",
+    "B",
+    "C"
+  ],
+  "main_lifts": [
+    "A1",
+    "A2",
+    "B1",
+    "B2"
+  ],
+  "warmup": "5 min: 3 min bike or rower, then 2 lighter ramp-up sets on the first exercise.",
+  "days": [
+    {
+      "code": "A",
+      "name": "Squat + bench",
+      "fatigue_tag": "heavy_lower",
+      "est_minutes": 55,
+      "short_minutes": 30,
+      "has_short_version": true,
+      "rounds": null,
+      "prescriptions": [
+        {
+          "id": "A1",
+          "exercise_id": "back_squat",
+          "order": 1,
+          "sets": 3,
+          "rep_min": 5,
+          "rep_max": 8,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": true,
+          "per_side": false,
+          "rest_s": 180,
+          "alternatives": [
+            {
+              "exercise_id": "hack_squat"
+            },
+            {
+              "exercise_id": "goblet_squat"
+            },
+            {
+              "exercise_id": "leg_press"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "A2",
+          "exercise_id": "bench_press",
+          "order": 2,
+          "sets": 3,
+          "rep_min": 5,
+          "rep_max": 8,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": true,
+          "per_side": false,
+          "rest_s": 180,
+          "alternatives": [
+            {
+              "exercise_id": "dumbbell_bench_press"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "A3",
+          "exercise_id": "chest_supported_row",
+          "order": 3,
+          "sets": 3,
+          "rep_min": 8,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 150,
+          "alternatives": [
+            {
+              "exercise_id": "seated_cable_row"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "A4",
+          "exercise_id": "romanian_deadlift",
+          "order": 4,
+          "sets": 2,
+          "rep_min": 8,
+          "rep_max": 10,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 90,
+          "alternatives": [
+            {
+              "exercise_id": "back_extension",
+              "rep_min": 10,
+              "rep_max": 15
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null,
+          "note": "Light"
+        },
+        {
+          "id": "A5",
+          "exercise_id": "lateral_raise",
+          "order": 5,
+          "sets": 2,
+          "rep_min": 12,
+          "rep_max": 15,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 60,
+          "alternatives": [
+            {
+              "exercise_id": "cable_lateral_raise"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "A6",
+          "exercise_id": "plank",
+          "order": 6,
+          "sets": 2,
+          "rep_min": 30,
+          "rep_max": 45,
+          "measure": "seconds",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 60,
+          "alternatives": [
+            {
+              "exercise_id": "dead_bug",
+              "rep_min": 8,
+              "rep_max": 12,
+              "measure": "reps",
+              "progression_rule": "reps_only"
+            }
+          ],
+          "progression_rule": "reps_only",
+          "superset_group": null
+        }
+      ]
+    },
+    {
+      "code": "B",
+      "name": "Hinge + overhead",
+      "fatigue_tag": "heavy_lower",
+      "est_minutes": 55,
+      "short_minutes": 30,
+      "has_short_version": true,
+      "rounds": null,
+      "prescriptions": [
+        {
+          "id": "B1",
+          "exercise_id": "trap_bar_deadlift",
+          "order": 1,
+          "sets": 3,
+          "rep_min": 4,
+          "rep_max": 6,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": true,
+          "per_side": false,
+          "rest_s": 180,
+          "alternatives": [
+            {
+              "exercise_id": "conventional_deadlift"
+            },
+            {
+              "exercise_id": "romanian_deadlift",
+              "rep_min": 6,
+              "rep_max": 8
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "B2",
+          "exercise_id": "overhead_press",
+          "order": 2,
+          "sets": 3,
+          "rep_min": 6,
+          "rep_max": 10,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": true,
+          "per_side": false,
+          "rest_s": 180,
+          "alternatives": [
+            {
+              "exercise_id": "dumbbell_shoulder_press"
+            },
+            {
+              "exercise_id": "seated_dumbbell_press"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "B3",
+          "exercise_id": "pull_up",
+          "order": 3,
+          "sets": 3,
+          "rep_min": 6,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 150,
+          "alternatives": [
+            {
+              "exercise_id": "lat_pulldown"
+            },
+            {
+              "exercise_id": "assisted_pull_up",
+              "progression_rule": "reps_only"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "B4",
+          "exercise_id": "bulgarian_split_squat",
+          "order": 4,
+          "sets": 2,
+          "rep_min": 8,
+          "rep_max": 10,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": true,
+          "rest_s": 90,
+          "alternatives": [
+            {
+              "exercise_id": "walking_lunge"
+            },
+            {
+              "exercise_id": "step_up"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "B5",
+          "exercise_id": "face_pull",
+          "order": 5,
+          "sets": 2,
+          "rep_min": 12,
+          "rep_max": 15,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 60,
+          "alternatives": [
+            {
+              "exercise_id": "reverse_fly"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null,
+          "note": "Program: 2 x 15. Range 12 to 15 so double progression has room."
+        },
+        {
+          "id": "B6",
+          "exercise_id": "hanging_knee_raise",
+          "order": 6,
+          "sets": 2,
+          "rep_min": 10,
+          "rep_max": 15,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 60,
+          "alternatives": [
+            {
+              "exercise_id": "cable_crunch",
+              "progression_rule": "double"
+            }
+          ],
+          "progression_rule": "reps_only",
+          "superset_group": null
+        }
+      ]
+    },
+    {
+      "code": "C",
+      "name": "Volume + arms",
+      "fatigue_tag": "mixed",
+      "est_minutes": 60,
+      "short_minutes": 30,
+      "has_short_version": true,
+      "rounds": null,
+      "prescriptions": [
+        {
+          "id": "C1",
+          "exercise_id": "leg_press",
+          "order": 1,
+          "sets": 3,
+          "rep_min": 10,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 150,
+          "alternatives": [
+            {
+              "exercise_id": "hack_squat"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "C2",
+          "exercise_id": "incline_dumbbell_press",
+          "order": 2,
+          "sets": 3,
+          "rep_min": 8,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 150,
+          "alternatives": [
+            {
+              "exercise_id": "incline_machine_press"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "C3",
+          "exercise_id": "seated_cable_row",
+          "order": 3,
+          "sets": 3,
+          "rep_min": 10,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 150,
+          "alternatives": [
+            {
+              "exercise_id": "one_arm_dumbbell_row"
+            },
+            {
+              "exercise_id": "machine_row"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "C4",
+          "exercise_id": "hamstring_curl",
+          "order": 4,
+          "sets": 3,
+          "rep_min": 10,
+          "rep_max": 15,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 75,
+          "alternatives": [
+            {
+              "exercise_id": "nordic_curl",
+              "rep_min": 3,
+              "rep_max": 8,
+              "progression_rule": "reps_only"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        },
+        {
+          "id": "C5",
+          "exercise_id": "biceps_curl",
+          "order": 5,
+          "sets": 2,
+          "rep_min": 10,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 60,
+          "alternatives": [
+            {
+              "exercise_id": "cable_biceps_curl"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": "C5",
+          "note": "Superset with triceps pushdown. Program: 2 x 12."
+        },
+        {
+          "id": "C6",
+          "exercise_id": "triceps_pushdown",
+          "order": 6,
+          "sets": 2,
+          "rep_min": 10,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 60,
+          "alternatives": [
+            {
+              "exercise_id": "overhead_triceps_extension"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": "C5",
+          "note": "Superset with biceps curl. Program: 2 x 12."
+        },
+        {
+          "id": "C7",
+          "exercise_id": "farmers_carry",
+          "order": 7,
+          "sets": 3,
+          "rep_min": 30,
+          "rep_max": 40,
+          "measure": "meters",
+          "starred": false,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 75,
+          "alternatives": [
+            {
+              "exercise_id": "suitcase_carry"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": null
+        }
+      ]
+    },
+    {
+      "code": "TRAVEL",
+      "name": "Travel version",
+      "fatigue_tag": "circuit",
+      "est_minutes": 30,
+      "short_minutes": null,
+      "has_short_version": false,
+      "rounds": 3,
+      "prescriptions": [
+        {
+          "id": "T1",
+          "exercise_id": "goblet_squat",
+          "order": 1,
+          "sets": 3,
+          "rep_min": 10,
+          "rep_max": 15,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 30,
+          "alternatives": [],
+          "progression_rule": "double",
+          "superset_group": "T"
+        },
+        {
+          "id": "T2",
+          "exercise_id": "dumbbell_bench_press",
+          "order": 2,
+          "sets": 3,
+          "rep_min": 8,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 30,
+          "alternatives": [
+            {
+              "exercise_id": "push_up",
+              "rep_min": 10,
+              "rep_max": 20,
+              "progression_rule": "reps_only"
+            }
+          ],
+          "progression_rule": "double",
+          "superset_group": "T"
+        },
+        {
+          "id": "T3",
+          "exercise_id": "one_arm_dumbbell_row",
+          "order": 3,
+          "sets": 3,
+          "rep_min": 10,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": true,
+          "rest_s": 30,
+          "alternatives": [],
+          "progression_rule": "double",
+          "superset_group": "T"
+        },
+        {
+          "id": "T4",
+          "exercise_id": "dumbbell_romanian_deadlift",
+          "order": 4,
+          "sets": 3,
+          "rep_min": 10,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 30,
+          "alternatives": [],
+          "progression_rule": "double",
+          "superset_group": "T"
+        },
+        {
+          "id": "T5",
+          "exercise_id": "split_squat",
+          "order": 5,
+          "sets": 3,
+          "rep_min": 8,
+          "rep_max": 12,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": true,
+          "rest_s": 30,
+          "alternatives": [],
+          "progression_rule": "double",
+          "superset_group": "T"
+        },
+        {
+          "id": "T6",
+          "exercise_id": "push_up",
+          "order": 6,
+          "sets": 3,
+          "rep_min": 10,
+          "rep_max": 20,
+          "measure": "reps",
+          "starred": true,
+          "main_lift": false,
+          "per_side": false,
+          "rest_s": 60,
+          "alternatives": [],
+          "progression_rule": "reps_only",
+          "superset_group": "T"
+        }
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "name": "return",
+      "label": "Return phase",
+      "week_from": 1,
+      "week_to": 4,
+      "rir_min": 3,
+      "rir_max": 4,
+      "sets": [
+        {
+          "weeks": [
+            1,
+            1
+          ],
+          "main_lift": 2,
+          "starred": 2,
+          "other_cap": 2
+        },
+        {
+          "weeks": [
+            2,
+            4
+          ],
+          "main_lift": 3,
+          "starred": 3,
+          "other_cap": null
+        }
+      ],
+      "large_jumps": true,
+      "top_set": null
+    },
+    {
+      "name": "build",
+      "label": "Build phase",
+      "week_from": 5,
+      "week_to": 7,
+      "rir_min": 2,
+      "rir_max": 2,
+      "sets": [
+        {
+          "weeks": [
+            5,
+            7
+          ],
+          "main_lift": 4,
+          "starred": 3,
+          "other_cap": null
+        }
+      ],
+      "large_jumps": false,
+      "top_set": null
+    },
+    {
+      "name": "deload",
+      "label": "Deload week",
+      "week_from": 8,
+      "week_to": 8,
+      "rir_min": 3,
+      "rir_max": 4,
+      "sets": [],
+      "large_jumps": false,
+      "top_set": null
+    },
+    {
+      "name": "push",
+      "label": "Push phase",
+      "week_from": 9,
+      "week_to": 11,
+      "rir_min": 1,
+      "rir_max": 2,
+      "sets": [
+        {
+          "weeks": [
+            9,
+            11
+          ],
+          "main_lift": 4,
+          "starred": 3,
+          "other_cap": null
+        }
+      ],
+      "large_jumps": false,
+      "top_set": null
+    },
+    {
+      "name": "consolidate",
+      "label": "Consolidate week",
+      "week_from": 12,
+      "week_to": 12,
+      "rir_min": 2,
+      "rir_max": 3,
+      "sets": [
+        {
+          "weeks": [
+            12,
+            12
+          ],
+          "main_lift": 3,
+          "starred": 3,
+          "other_cap": 2
+        }
+      ],
+      "large_jumps": false,
+      "top_set": {
+        "main_lifts": true,
+        "rir": 1
+      }
+    }
+  ],
+  "cardio": {
+    "name": "Intervals on bike or rower",
+    "modalities": [
+      "bike",
+      "rower"
+    ],
+    "protocols": [
+      {
+        "weeks": [
+          1,
+          2
+        ],
+        "warmup_min": 5,
+        "intervals": 4,
+        "hard_min": 2,
+        "easy_min": 2,
+        "cooldown_min": 5
+      },
+      {
+        "weeks": [
+          3,
+          4
+        ],
+        "warmup_min": 5,
+        "intervals": 3,
+        "hard_min": 4,
+        "easy_min": 3,
+        "cooldown_min": 5
+      },
+      {
+        "weeks": [
+          5,
+          12
+        ],
+        "warmup_min": 5,
+        "intervals": 4,
+        "hard_min": 4,
+        "easy_min": 3,
+        "cooldown_min": 5
+      }
+    ],
+    "deload_easy_min": 30,
+    "hard_description": "90 to 95% of max heart rate: breathing heavily, able to say only a few words."
+  },
+  "travel": {
+    "counts_toward_floor": true,
+    "advances_rotation": false
+  },
+  "limitations": {
+    "knee_friendly": {
+      "label": "Knee friendly",
+      "description": "Prefer hack squat or leg press over deep barbell squat.",
+      "avoid_tags": [
+        "deep_knee_flexion"
+      ],
+      "prefer_tags": [
+        "knee_friendly"
+      ]
+    },
+    "shoulder_symmetry": {
+      "label": "Shoulder symmetry",
+      "description": "Prefer unilateral dumbbell pressing and rows.",
+      "avoid_tags": [],
+      "prefer_tags": [
+        "unilateral"
+      ]
+    }
+  }
+}

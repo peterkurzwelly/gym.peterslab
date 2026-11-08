@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* Design tokens. peterslab.app palette: ink background, paper text, one orange accent.
+   Green is used only for "floor reached / target reached" states (SPEC 4.1). Never red. */
+@theme {
+  --color-ink: #04261e;
+  --color-ink-2: #0a3328; /* raised surface: cards */
+  --color-ink-3: #114033; /* pressed / chips */
+  --color-line: #1d4d3f; /* hairlines, drafting grid */
+  --color-paper: #f2edd5; /* primary text */
+  --color-paper-dim: #b9bba5; /* secondary text, ≥ 7:1 on ink */
+  --color-paper-faint: #7f8d7f; /* tertiary text, ≥ 4.5:1 on ink */
+  --color-orange: #f26716; /* the accent: primary actions, check buttons, links */
+  --color-orange-dim: #9a4a1c;
+  --color-go: #9bd49a; /* floor / target reached */
+  --color-go-dim: #2f5e3c;
+
+  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-mono);
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    margin: 0;
+    overscroll-behavior-y: none;
+    font-variant-numeric: tabular-nums;
+  }
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+}

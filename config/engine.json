@@ -1,0 +1,77 @@
+{
+  "engine_version": "1.0.0",
+  "timezone_default": "Europe/Stockholm",
+  "week": {
+    "starts_on": "monday",
+    "strength_target": 3,
+    "cardio_target": 1,
+    "strength_floor": 2,
+    "zero_week_counts": ["strength", "cardio", "travel"],
+    "repair": { "window_weeks": 4, "max_per_window": 1, "evidence": "convention" }
+  },
+  "e1rm": { "divisor": 30 },
+  "fractional_sets": { "primary": 1.0, "secondary": 0.5 },
+  "calibration": {
+    "start_pct": 0.6,
+    "start_pct_min": 0.5,
+    "start_pct_max": 0.7,
+    "first_exposure_target": "rep_max",
+    "calibration_reps": 8,
+    "calibration_min_rir": 3,
+    "evidence": "convention"
+  },
+  "progression": {
+    "below_range_min_sets": 2,
+    "after_increase_target": "rep_min",
+    "hold_target": "rep_max",
+    "large_jump": { "reps_over": 2, "all_sets_min_over": 1, "share_sets_over": 0.5, "reps_over_for_max": 4, "pct_min": 0.05, "pct_max": 0.10, "evidence": "convention" },
+    "reset": { "consecutive_below": 2, "pct_min": 0.05, "pct_max": 0.10, "evidence": "convention" },
+    "return_e1rm_cap_pct": 0.10,
+    "max_jump_pct": 0.10
+  },
+  "stall": { "exposures": 3 },
+  "reactive_deload": {
+    "max_per_block": 1,
+    "e1rm_drop_pct": 0.05,
+    "e1rm_drop_lifts": 2,
+    "e1rm_drop_span_sessions": 2,
+    "missed_reps_sessions": 2,
+    "missed_reps_exercises": 2,
+    "checkin_avg_max": 2.0,
+    "checkin_days": 3,
+    "evidence": "convention"
+  },
+  "readiness": {
+    "threshold": 2.25,
+    "set_drops": [ { "max_avg": 2.25, "drop": 1 }, { "max_avg": 1.5, "drop": 2 } ],
+    "load_cut": { "at_threshold_pct": 0.05, "at_floor_pct": 0.10, "floor_avg": 1.0, "pct_step": 0.025, "scope": "first_exercise" },
+    "min_sets": 1,
+    "cardio_swap_easy_min": 30,
+    "evidence": "convention"
+  },
+  "deload": { "planned_week": 8, "sets_base_phase": "build", "sets_factor": 0.5, "sets_rounding": "ceil", "min_sets": 1 },
+  "short_version": { "set_reduction": 1, "min_sets": 1 },
+  "comeback": { "set_reduction": 1, "min_sets": 1 },
+  "break": {
+    "short_days_min": 7,
+    "short_days_max": 14,
+    "short_load_pct": 0.85,
+    "short_duration_days": 7,
+    "long_restart_week": 2,
+    "long_load_pct": 0.85,
+    "evidence": "convention"
+  },
+  "never_miss_twice": { "hours": 48 },
+  "spacing": { "max_consecutive_strength_days": 2, "hard_cardio_before_heavy_hours": 24, "heavy_days": ["A", "B"] },
+  "volume": {
+    "band_min": 8,
+    "band_max": 10,
+    "session_cap": 11,
+    "band_phases": ["build", "push"],
+    "tracked_muscles": ["chest", "back", "shoulders", "biceps", "triceps", "quads", "hamstrings", "glutes"],
+    "evidence": "research"
+  },
+  "session": { "auto_finish_hours": 3 },
+  "rest": { "main_lift_s": 180, "starred_s": 150, "other_s": 75 },
+  "who": { "weekly_minutes": 150, "hard_multiplier": 2 }
+}
