@@ -73,5 +73,26 @@
   },
   "session": { "auto_finish_hours": 3 },
   "rest": { "main_lift_s": 180, "starred_s": 150, "other_s": 75 },
-  "who": { "weekly_minutes": 150, "hard_multiplier": 2 }
+  "who": { "weekly_minutes": 150, "hard_multiplier": 2 },
+  "body": {
+    "mifflin": { "per_kg": 10, "per_cm": 6.25, "per_year": 5, "male_offset": 5, "female_offset": -161 },
+    "activity_factor": { "desk": 1.4, "feet": 1.6, "physical": 1.8 },
+    "kcal_per_kg_fat": 7700,
+    "cut_rate": { "default_pct": 0.5, "min_pct": 0.25, "max_pct": 1.0 },
+    "gain_rate": { "target_pct": 0.25, "max_pct": 0.5 },
+    "recomp_offset_kcal": -100,
+    "gain_offset_kcal": 250,
+    "kcal_floor": { "male": 1500, "female": 1200 },
+    "kcal_round_to": 50,
+    "protein": { "g_per_kg": 2.0, "round_to_g": 5, "hit_tolerance": 0.1 },
+    "fat": { "min_g_per_kg": 0.6, "round_to_g": 5 },
+    "steps_target_default": 8000,
+    "trend": { "window_days": 7, "min_weigh_ins": 3 },
+    "rate": { "span_days": 14, "min_span_days": 7 },
+    "pace": { "tolerance_pct": 0.15 },
+    "adjustment": { "step_kcal": 100, "tolerance_pct": 0.15, "max_total_kcal": 400, "min_weigh_ins": 3, "min_protein_days": 4, "min_gap_days": 4 },
+    "goal": { "max_weeks": 104 },
+    "series_max_days": 120,
+    "evidence": "convention"
+  }
 }

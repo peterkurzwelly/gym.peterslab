@@ -6,10 +6,10 @@ export function Skeleton({ className, height = 16, width = "100%", lines }: { cl
     return (
       <div className={cx("flex flex-col gap-2", className)} aria-hidden>
         {Array.from({ length: lines }, (_, i) => (
-          <div key={i} className="gym-skeleton rounded-[2px]" style={{ height, width: i === lines - 1 ? "60%" : width }} />
+          <div key={i} className="gym-skeleton rounded-lg" style={{ height, width: i === lines - 1 ? "60%" : width }} />
         ))}
       </div>
     );
   }
-  return <div aria-hidden className={cx("gym-skeleton rounded-[2px]", className)} style={{ height, width }} />;
+  return <div aria-hidden className={cx("gym-skeleton rounded-lg", className)} style={{ height, width }} />;
 }

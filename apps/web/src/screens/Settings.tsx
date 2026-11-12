@@ -1,19 +1,21 @@
 /**
- * Settings (gear in the header): Sync, Program, Timers and sound, Equipment, Data, About.
+ * The You tab: goal and body details first, then Sync, Program, Timers and sound, Equipment, Data, About.
  * Every write goes through updateSettings or the data layer. No keyboard opens unless a field is tapped.
  */
 import { useEffect } from "react";
-import { Page, ShellTitle, Skeleton } from "../components";
-import { ensureSettings, useSettings } from "../data";
+import { Page, PageTitle, ShellTitle, Skeleton } from "../components";
+import { ensureSettings, useBody, useSettings } from "../data";
 import { AboutSection } from "./settings/AboutSection";
 import { DataSection } from "./settings/DataSection";
 import { EquipmentSection } from "./settings/EquipmentSection";
+import { GoalSection } from "./settings/GoalSection";
 import { ProgramSection } from "./settings/ProgramSection";
 import { SyncSection } from "./settings/SyncSection";
 import { TimersSection } from "./settings/TimersSection";
 import { settingsDefaults, useExercises } from "./settings/useSettingsData";
 
 const JUMPS = [
+  { id: "goal", label: "Goal" },
   { id: "sync", label: "Sync" },
   { id: "program", label: "Program" },
   { id: "timers", label: "Timers" },
@@ -24,6 +26,7 @@ const JUMPS = [
 
 export function SettingsScreen() {
   const settings = useSettings();
+  const body = useBody();
   const exercises = useExercises();
   const defaults = settingsDefaults();
 
@@ -34,24 +37,26 @@ export function SettingsScreen() {
   return (
     <Page className="gap-8 pb-6">
       <ShellTitle>
-        <span className="text-paper">Settings</span>
+        <span className="text-fg-dim">Workout OS</span>
       </ShellTitle>
 
-      <div className="flex flex-col gap-3">
-        <h1 className="m-0 font-display text-[40px] font-normal leading-none text-paper">Settings</h1>
-        <nav aria-label="Settings sections" className="-mx-1 flex flex-wrap gap-x-1 gap-y-0">
+      <div className="flex flex-col gap-2">
+        <PageTitle eyebrow="Goal · sync · settings">You</PageTitle>
+        <nav aria-label="Settings sections" className="gym-scroll-x -mx-4 flex gap-2 overflow-x-auto px-4">
           {JUMPS.map((j) => (
             <button
               key={j.id}
               type="button"
               onClick={() => document.getElementById(j.id)?.scrollIntoView({ block: "start", behavior: "smooth" })}
-              className="min-h-11 rounded-[3px] px-2 text-[11.5px] uppercase tracking-[0.12em] text-paper-dim active:bg-ink-3 active:text-paper"
+              className="min-h-10 shrink-0 rounded-full bg-card px-4 text-[13.5px] font-semibold text-fg-dim active:bg-raise active:text-fg"
             >
               {j.label}
             </button>
           ))}
         </nav>
       </div>
+
+      {settings && body && <GoalSection settings={settings} body={body} />}
 
       <SyncSection index="01" />
 

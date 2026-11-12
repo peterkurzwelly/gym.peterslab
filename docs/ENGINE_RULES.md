@@ -12,7 +12,7 @@ Each rule has a `rule_id`. Every number the engine outputs carries a `Decision` 
 - **Working sets** are set logs with `is_warmup = false`. Top sets (`is_top_set`) count as working sets for volume and e1RM, but are excluded from double progression evaluation.
 - **Finished sessions.** A session is finished when `ended_at` is set, or when its last activity (latest set `completed_at`, else `started_at`) is more than `session.auto_finish_hours` before `now` (reported in `auto_finished`). Unfinished sessions never feed progression. They do count toward the week as soon as they have one logged set (strength) or a cardio log (cardio).
 - **Qualifying session** (counts toward week totals): strength day (`A`, `B`, `C`) with ≥1 working set; `TRAVEL` with ≥1 working set (counts as strength when `program.travel.counts_toward_floor`); `CARDIO` session with a cardio log. Walks (`cardio_log.session_id = null`, modality `walk`) never count as sessions; they only add walking minutes.
-- **Decision ids** are deterministic: progression `d:<source_session_id>:<exercise_id>@<rep_min>-<rep_max>`; first exposure `d:init:<exercise_id>@<rep_min>-<rep_max>`; plan level `d:plan:<YYYY-MM-DD>:<code>:<rule_id>`; week/event level `d:event:<rule_id>:<week_id or session_id>`. `date` is the source session's `ended_at` (or `ctx.now` for plan level). `updated_at` = `date`, `deleted_at` = null.
+- **Decision ids** are deterministic: progression `d:<source_session_id>:<exercise_id>@<rep_min>-<rep_max>`; first exposure `d:init:<exercise_id>@<rep_min>-<rep_max>`; plan level `d:plan:<YYYY-MM-DD>:<code>:<rule_id>`; week/event level `d:event:<rule_id>:<week_id or session_id>`; body and fuel `d:body:targets` and `d:body:kcal:<week start>` (section 10). `date` is the source session's `ended_at` (or `ctx.now` for plan level). `updated_at` = `date`, `deleted_at` = null.
 - **Rounding.** Loads round to the exercise's increment (`settings.increment_overrides[exercise_id]` ?? `exercise.increment_kg`) with `nearest`, except reductions (reset, readiness, break, e1RM mapping) which round **down**, and increases which round **up** to at least one `step_kg` above the old load. Never output a negative load. Results carry at most 2 decimals.
 
 ## 1. Calculations
@@ -135,3 +135,83 @@ Bench press examples (prescription 3 × 6 to 8, target RIR 2, 80 kg, step 2.5, i
 ## 9. Session summary
 
 `summarizeSession` lists, per exercise logged, the progression decision produced by this session (`from` = the base before, `to` = the new base, `explanation`), or the hold rule when the session was not progression eligible, plus e1RM PRs (session e1RM > previous best) and the updated week state. PRs come only from e1RMs that update `stats` (progression eligible, so a hold session never reports one that the next session reports again), and never from bodyweight exercises (their e1RM is added load only, kept for trends). Example line: "Bench press +2.5 kg: all sets hit 8 reps at RIR 2."
+
+## 10. Body and fuel
+
+`computeBody({ config, settings, bodyLogs, now })` returns a `BodyState`. It is separate from `computeState`: it reads body logs and settings only, and nothing in sections 1 to 9 depends on it. Pure and deterministic like the rest: `now` comes in, same input gives the same output and the same decision ids. Every threshold is in `config.body`.
+
+**Units.** In `config.body`, every key ending in `_pct` is **percent of body weight per week** (0.5 means 0.5%), the same unit as `settings.cut_rate_pct`. That differs from the fractions used by the `_pct` keys in the other config groups.
+
+**Inputs.**
+- `body_log`: one row per local date (`bd_YYYY-MM-DD`), every value optional. Ignored: deleted rows, rows dated after today, rows without any value. Two rows for one date: the newest `updated_at` wins (then the higher id).
+- A **weigh-in** is a row with `weight_kg`. `steps`, `protein_g` and `kcal` are the day's running totals.
+- **Today** is the local date of `now` in `settings.timezone` (config default when it is not valid), like section 0.
+- Settings rows stored before the body fields existed take: no profile, `job_activity` desk, `goal` cut, `cut_rate_pct` = `cut_rate.default_pct`, `steps_target` = `steps_target_default`. `cut_rate_pct` is held inside `cut_rate.min_pct`..`max_pct`.
+
+**Trend.** For each calendar day D, the trend value is the mean of the weigh-ins in the `trend.window_days` days ending on D, when that window holds at least `trend.min_weigh_ins` of them, else null. Rounded to 2 decimals.
+- `series`: one point `{ date, weight, avg }` per calendar day from the first log through today, at most the last `series_max_days` days. Days without a weigh-in have `weight: null`.
+- `latest_weight`: the most recent weigh-in. `trend_weight`: the most recent non null trend value. `start_weight`: the first trend value in the whole history (not only the series), or the first weigh-in while there is no trend yet. `change_kg = trend_weight − start_weight`.
+- **Current weight** (`current_weight`, used by the targets and shown on screen): `trend_weight` when its day is on or after the last weigh-in (`current_is_trend` true), else `latest_weight`. So one weigh-in after a long pause counts at once.
+
+**Rate.** Needs a trend value for today. The reference is the trend value `rate.span_days` days ago, or the nearest later day that has one, at least `rate.min_span_days` back. The **days between** are counted from where the two averages really sit: each trend value has a center, the mean day of the weigh-ins in its window, and a reference whose center is less than `rate.min_span_days` before today's center is passed over (D30). `rate_kg_per_week = (today − reference) / days between × 7`, `rate_pct_per_week = rate_kg_per_week / reference × 100`. Both signed (negative = losing), 2 decimals. Without a trend today or a reference: null.
+
+**Profile.** `missing` lists what the calorie target still needs, in this order: `sex`, `birth_year`, `height_cm`, `weight` (no weigh-in yet). `profile_complete` when it is empty.
+
+**Targets** (`targets`, decision `d:body:targets`, dated `now`, its `explanation` = `targets.reason`).
+- **Maintenance:** Mifflin St Jeor BMR = `mifflin.per_kg` × current weight + `mifflin.per_cm` × `height_cm` − `mifflin.per_year` × age + `male_offset` or `female_offset`, where age = local year of `now` − `birth_year`. `maintenance_kcal` = BMR × `activity_factor[job_activity]`, rounded to a whole kcal. null until the profile is complete. The factor covers the job plus the program's training.
+- **Goal offset** (`goal_offset_kcal`): cut = −(`cut_rate_pct` / 100 × current weight × `kcal_per_kg_fat` / 7), rounded to a whole kcal (0 while there is no weight); recomp = `recomp_offset_kcal`; gain = `gain_offset_kcal`.
+- **Calories:** `maintenance_kcal + goal_offset_kcal + adjustments_kcal`, rounded to the nearest `kcal_round_to`, never below `kcal_floor[sex]`. null until the profile is complete.
+- **Protein:** `protein.g_per_kg` × current weight, rounded to `protein.round_to_g`. **Fat minimum:** `fat.min_g_per_kg` × current weight, rounded to `fat.round_to_g`. Both null until there is a weight. **Steps:** `settings.steps_target`.
+- **Overrides:** `settings.kcal_override` and `settings.protein_override_g` win when set (a stored 0 counts as not set), also before the profile is complete and below the floor (it is the user's own number). `maintenance_kcal`, `goal_offset_kcal` and `adjustments_kcal` still show the engine's estimate; the decision output carries `estimate_kcal`.
+
+| rule_id | When | Reason (example) |
+|---|---|---|
+| `body.overrides` | both overrides set | "Your own targets: 1900 kcal and 150 g protein." |
+| `body.kcal_override` | `kcal_override` set | "Your own calorie target, the estimate is 2050 kcal." |
+| `body.protein_override` | `protein_override_g` set | "About 2492 kcal to hold weight, minus 467 to lose 0.5% a week, with your own protein target." |
+| `body.setup` | no calorie target yet | "Add sex, birth year, height and a weigh-in to get a calorie target." |
+| `body.kcal_floor` | the floor was applied | "Held at the 1500 kcal floor, the estimate came out lower." |
+| `body.cut` | goal cut | "About 2492 kcal to hold weight, minus 467 to lose 0.5% a week." |
+| `body.recomp` | goal recomp | "About 2492 kcal to hold weight, minus 100 for a slow recomp." |
+| `body.gain` | goal gain | "About 2492 kcal to hold weight, plus 250 to gain slowly." |
+
+First match wins, top to bottom. With adjustments the reason ends ", minus 100 from your trend." (or plus).
+
+**Pace** (`pace`, `pace_text`). Compared on `rate_pct_per_week` with `pace.tolerance_pct`; the text speaks in kg a week.
+
+| pace | When |
+|---|---|
+| `setup` | the profile is not complete (wins over everything) |
+| `collecting` | no rate yet |
+| `fast` | cut: losing more than `cut_rate.max_pct`. gain: gaining more than `gain_rate.max_pct` |
+| `on_pace` | cut: losing at least `cut_rate_pct − tolerance` (up to the max). gain: gaining at least `gain_rate.target_pct − tolerance`. recomp: within ± tolerance |
+| `slow` | cut or gain: below that bar, but not moving the other way by more than the tolerance (holding still is slow) |
+| `off_goal` | cut: gaining more than the tolerance. gain: losing more than the tolerance. recomp: drifting more than the tolerance either way |
+
+Examples: "On pace: down 0.4 kg a week." · "Down 0.1 kg a week. The goal is 0.4 kg a week down." · "Holding steady. The goal is 0.4 kg a week down." · "Down 1.4 kg a week. That is fast, eat a little more." · "Up 0.3 kg a week. Recomp aims to hold weight." · "Trend started. Keep weighing in to see your pace." · "Weigh in a few mornings to see your trend."
+
+**Weeks to goal.** null without `goal_weight_kg` or a current weight. 0 once reached (cut: current weight at or below the goal, gain: at or above). Otherwise `ceil((goal − current_weight) / rate_kg_per_week)` when the rate points at the goal, null when it is flat, points away, or the answer is more than `goal.max_weeks`.
+
+**Weekly adaptive adjustment** (`adjustments_kcal`, one decision per applied step). Replayed from the logs on every call: walk the calendar weeks (Monday to Sunday) from the week after the first log's week through the last **completed** week (its Sunday is before today), with a running total starting at 0 (or at the carried over correction, see below).
+1. Skip the week when it or the week before has fewer than `adjustment.min_weigh_ins` weigh-ins, or when it has protein logged (above 0) on fewer than `adjustment.min_protein_days` days. Thin data never moves the target.
+2. `gap_days` = mean day of the week's weigh-ins − mean day of the weigh-ins of the week before. Skip the week when it is under `adjustment.min_gap_days`. `change_pct` = (mean weight of the week − mean of the week before) / mean of the week before × 100 × 7 / `gap_days`, 2 decimals. Two fully weighed weeks are 7 days apart, so nothing changes for them; a week weighed only at its end is no longer read as a slow week (D30).
+3. The step, with `tolerance = adjustment.tolerance_pct`:
+   - **cut:** losing less than `cut_rate_pct − tolerance` (holding or gaining included) → −`step_kcal`. Losing more than `cut_rate.max_pct` → +`step_kcal`.
+   - **gain:** gaining less than `gain_rate.target_pct − tolerance` → +`step_kcal`. Gaining more than `gain_rate.max_pct` → −`step_kcal`.
+   - **recomp:** up more than the tolerance → −`step_kcal`. Down more than the tolerance → +`step_kcal`.
+   - Otherwise nothing.
+4. The running total stays within ±`adjustment.max_total_kcal`: a step is cut to what is left, and a step of 0 is no decision.
+
+Each applied step is a decision `d:body:kcal:<Monday of the week>`, `rule_id` `body.adjust_less` or `body.adjust_more`, dated local midnight of the Monday after that week (when it starts to apply), output `{ delta_kcal, total_kcal }`. Explanations: "Down 0.1% a week against a 0.5% goal: 100 kcal less." · "Down 1.28% a week, faster than the 1% limit: 100 kcal more." · "Flat this week against a 0.5% goal: 100 kcal less." · "Up 0.35% a week while holding weight: 100 kcal less."
+
+**A changed goal or pace never re-judges the past** (D30, replaces the replay rule of D26). The app sets `settings.body_adjust_since` to today's local date and `settings.body_adjust_base_kcal` to the `adjustments_kcal` of that moment whenever `goal` or `cut_rate_pct` changes. With `body_adjust_since` set, the running total starts at `body_adjust_base_kcal` (held within ±`max_total_kcal`) and weeks whose Monday is before that date are skipped: they were judged against the goal of their time, and the week of the change itself is mixed. The weeks from the first Monday on or after that date are judged against the current `goal` and `cut_rate_pct`. Without `body_adjust_since` every week since the first log counts. Adjustments do not need the profile. The floor still holds after them.
+
+**Today.** `log_today` is today's row. `weighed_today`: it has a weight. `protein_today` and `steps_today`: its values, 0 when missing. `kcal_today`: its value or null. `protein_hit`: there is a protein target and `protein_today ≥ (1 − protein.hit_tolerance) × target`. `steps_hit`: `steps_today ≥ targets.steps`.
+
+**Week** (`week`, the current calendar week through today): `weigh_ins`; `protein_days` = days the protein target was hit with the tolerance (without a protein target: days with protein logged); `steps_avg` = mean over the days with steps logged, whole steps, else null; `days_logged` = days with any value.
+
+**Waist.** From the rows with `waist_cm`: `first`, `latest`, `change_cm = latest − first`, `latest_date`. null without one.
+
+**Decisions.** `decisions` = the targets decision first, then the adjustment decisions, oldest week first. They are computed, not stored: replaying the logs gives them back.
+
+**Copy.** Every string is one or two short sentences, plain, no guilt, no dashes as punctuation.

@@ -24,6 +24,18 @@ export const fixtures: { [K in SyncTable]: (o?: Partial<RowOf<K>>) => RowOf<K> }
     sound: true,
     evening_hour: 20,
     week_killers: ["evenings", "low_energy"],
+    sex: "male",
+    birth_year: 1986,
+    height_cm: 181.5,
+    job_activity: "feet",
+    goal: "recomp",
+    cut_rate_pct: 0.75,
+    goal_weight_kg: 79.5,
+    kcal_override: 2150,
+    protein_override_g: 165,
+    steps_target: 9000,
+    body_adjust_since: "2026-11-05",
+    body_adjust_base_kcal: -100,
     ...base,
     ...o,
   }),
@@ -121,6 +133,19 @@ export const fixtures: { [K in SyncTable]: (o?: Partial<RowOf<K>>) => RowOf<K> }
     ...base,
     ...o,
   }),
+  body_log: (o = {}) => ({
+    id: "bd_2026-11-02",
+    date: "2026-11-02",
+    weight_kg: 84.35,
+    waist_cm: 91.5,
+    steps: 9120,
+    protein_g: 162.5,
+    kcal: 2140,
+    sleep_h: 7.25,
+    note: "Slept well.",
+    ...base,
+    ...o,
+  }),
 };
 
 export function allFixtures() {
@@ -133,5 +158,6 @@ export function allFixtures() {
     cardio_log: [fixtures.cardio_log()],
     checkin: [fixtures.checkin()],
     decision: [fixtures.decision()],
+    body_log: [fixtures.body_log()],
   };
 }

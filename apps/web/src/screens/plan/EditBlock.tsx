@@ -83,40 +83,40 @@ function ExerciseRow({ ex, ctx, open, onToggle }: { ex: PlannedExercise; ctx: En
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="gym-press flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left active:bg-ink-3"
+        className="gym-press flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left active:bg-raise"
       >
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-[14.5px] text-paper">{ex.name}</span>
+            <span className="text-[14.5px] text-fg">{ex.name}</span>
             {ex.starred && (
               <Badge tone="outline" title="In the 30 min version">
-                ★
+                30 min
               </Badge>
             )}
             {ex.swapped === "block" && <Badge tone="neutral">For the block</Badge>}
           </span>
-          <span className="mt-0.5 block text-[12px] text-paper-dim">
+          <span className="mt-0.5 block text-[12px] text-fg-dim">
             {ex.sets.length} × {amount}
-            {ex.swapped === "block" && <span className="text-paper-faint"> · program: {primaryName}</span>}
+            {ex.swapped === "block" && <span className="text-fg-faint"> · program: {primaryName}</span>}
           </span>
         </span>
         {ex.main_lift ? (
-          <LockIcon size={18} className="shrink-0 text-paper-faint" aria-label="Main lift, fixed for the block" />
+          <LockIcon size={18} className="shrink-0 text-fg-faint" aria-label="Main lift, fixed for the block" />
         ) : hasChoice ? (
-          <ChevronIcon size={18} className={cx("shrink-0 text-paper-faint transition-transform duration-100 motion-reduce:transition-none", open && "rotate-90")} />
+          <ChevronIcon size={18} className={cx("shrink-0 text-fg-faint transition-transform duration-100 motion-reduce:transition-none", open && "rotate-90")} />
         ) : null}
       </button>
       {open && ex.main_lift && (
-        <p className="m-0 flex items-start gap-2 px-4 pb-3 text-[13px] leading-snug text-paper-dim">
-          <LockIcon size={16} className="mt-[1px] shrink-0 text-paper-faint" />
+        <p className="m-0 flex items-start gap-2 px-4 pb-3 text-[13px] leading-snug text-fg-dim">
+          <LockIcon size={16} className="mt-[1px] shrink-0 text-fg-faint" />
           <span>{MAIN_LIFT_NOTE}</span>
         </p>
       )}
       {open && !ex.main_lift && (
-        <div className="bg-ink/60 pb-1">
-          <div className="px-4 pb-1 pt-1 text-[11px] uppercase tracking-[0.14em] text-paper-faint">Swap for the block</div>
+        <div className="bg-night/60 pb-1">
+          <div className="px-4 pb-1 pt-1 text-[11px] uppercase tracking-[0.08em] text-fg-faint">Swap for the block</div>
           {!hasChoice ? (
-            <p className="m-0 px-4 py-2 text-[13px] text-paper-faint">No alternatives listed for this exercise.</p>
+            <p className="m-0 px-4 py-2 text-[13px] text-fg-faint">No alternatives listed for this exercise.</p>
           ) : (
             <ul role="radiogroup" aria-label={`Exercise for ${primaryName} this block`} className="m-0 list-none p-0">
               {options.map((o) => {
@@ -131,19 +131,19 @@ function ExerciseRow({ ex, ctx, open, onToggle }: { ex: PlannedExercise; ctx: En
                       aria-label={`${o.name}${o.primary ? ", program exercise" : ""}, ${range}${!o.allowed && o.reason ? `. ${o.reason}` : ""}`}
                       disabled={!o.allowed || saving}
                       onClick={() => void choose(o)}
-                      className="gym-press flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left active:bg-ink-3 disabled:active:bg-transparent"
+                      className="gym-press flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left active:bg-raise disabled:active:bg-transparent"
                     >
-                      <span className={cx("grid h-5 w-5 shrink-0 place-items-center rounded-full border", on ? "border-paper bg-paper text-ink" : "border-paper-faint")}>
+                      <span className={cx("grid h-5 w-5 shrink-0 place-items-center rounded-full border", on ? "border-fg bg-fg text-night" : "border-fg-faint")}>
                         {on && <CheckIcon size={14} />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className={cx("block text-[14px]", o.allowed ? "text-paper" : "text-paper-faint line-through decoration-paper-faint/50")}>
+                        <span className={cx("block text-[14px]", o.allowed ? "text-fg" : "text-fg-faint line-through decoration-fg-faint/50")}>
                           {o.name}
-                          {o.primary && <span className="text-paper-faint"> · program</span>}
+                          {o.primary && <span className="text-fg-faint"> · program</span>}
                         </span>
-                        {!o.allowed && o.reason && <span className="block text-[12px] leading-snug text-paper-faint">{o.reason}</span>}
+                        {!o.allowed && o.reason && <span className="block text-[12px] leading-snug text-fg-faint">{o.reason}</span>}
                       </span>
-                      <span className="shrink-0 text-[12px] tabular-nums text-paper-dim">{range}</span>
+                      <span className="shrink-0 text-[12px] tabular-nums text-fg-dim">{range}</span>
                     </button>
                   </li>
                 );
@@ -184,10 +184,10 @@ function SessionOrder({ state, ctx }: { state: EngineState; ctx: EngineContext }
       <ol className="m-0 list-none p-0" aria-label="Session order">
         {order.map((code, i) => (
           <li key={code} className={cx("flex min-h-12 items-center gap-3 pl-4 pr-2", i > 0 && "border-t border-line/70")}>
-            <span className="w-4 text-[12px] text-paper-faint">{i + 1}</span>
+            <span className="w-4 text-[12px] text-fg-faint">{i + 1}</span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[14px] text-paper">Session {code}</span>
-              {names[code] && <span className="block truncate text-[12px] text-paper-dim">{names[code]}</span>}
+              <span className="block text-[14px] text-fg">Session {code}</span>
+              {names[code] && <span className="block truncate text-[12px] text-fg-dim">{names[code]}</span>}
             </span>
             {state.next.code === code && <Badge tone="outline">Next</Badge>}
             <button
@@ -195,7 +195,7 @@ function SessionOrder({ state, ctx }: { state: EngineState; ctx: EngineContext }
               aria-label={`Move session ${code} earlier`}
               disabled={i === 0 || saving}
               onClick={() => move(i, -1)}
-              className="gym-press grid h-11 w-11 place-items-center rounded-[3px] text-paper-dim active:bg-ink-3 disabled:opacity-25"
+              className="gym-press grid h-11 w-11 place-items-center rounded-2xl text-fg-dim active:bg-raise disabled:opacity-25"
             >
               <ArrowUpIcon size={18} />
             </button>
@@ -204,7 +204,7 @@ function SessionOrder({ state, ctx }: { state: EngineState; ctx: EngineContext }
               aria-label={`Move session ${code} later`}
               disabled={i === order.length - 1 || saving}
               onClick={() => move(i, 1)}
-              className="gym-press grid h-11 w-11 place-items-center rounded-[3px] text-paper-dim active:bg-ink-3 disabled:opacity-25"
+              className="gym-press grid h-11 w-11 place-items-center rounded-2xl text-fg-dim active:bg-raise disabled:opacity-25"
             >
               <ArrowDownIcon size={18} />
             </button>
@@ -212,7 +212,7 @@ function SessionOrder({ state, ctx }: { state: EngineState; ctx: EngineContext }
         ))}
       </ol>
       <div className="flex min-h-11 items-center justify-between gap-3 border-t border-line/70 pl-4 pr-1">
-        <span className="text-[12px] leading-snug text-paper-faint">The next session follows this order. No fixed days.</span>
+        <span className="text-[12px] leading-snug text-fg-faint">The next session follows this order. No fixed days.</span>
         {!isDefault && (
           <Button variant="ghost" size="sm" disabled={saving} onClick={() => void save([...def])}>
             Reset
@@ -257,9 +257,9 @@ export function EditBlock({ state, ctx }: { state: EngineState; ctx: EngineConte
             ))}
           </ul>
         ) : (
-          <p className="m-0 border-t border-line/70 px-4 py-3 text-[13px] text-paper-faint">This session could not be planned right now. Your log is safe.</p>
+          <p className="m-0 border-t border-line/70 px-4 py-3 text-[13px] text-fg-faint">This session could not be planned right now. Your log is safe.</p>
         )}
-        <p className="m-0 flex items-start gap-2 border-t border-line/70 px-4 py-3 text-[12px] leading-snug text-paper-faint">
+        <p className="m-0 flex items-start gap-2 border-t border-line/70 px-4 py-3 text-[12px] leading-snug text-fg-faint">
           <LockIcon size={15} className="mt-[1px] shrink-0" />
           <span>{MAIN_LIFT_NOTE}</span>
         </p>

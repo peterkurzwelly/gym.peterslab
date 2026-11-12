@@ -21,29 +21,29 @@ import { muscleLabel } from "../plan/model";
 import type { CardioRow, ChartData, CheckinRow, E1rmSeries, VolumeRow } from "./model";
 
 // SVG presentation attributes cannot read CSS variables, so the tokens from styles.css are mirrored here.
-const PAPER = "#f2edd5"; // --color-paper
-const PAPER_DIM = "#b9bba5"; // --color-paper-dim
-const FAINT = "#7f8d7f"; // --color-paper-faint
-const LINE = "#1d4d3f"; // --color-line
-const ORANGE = "#f26716"; // --color-orange (accent: the latest point)
-const SURFACE = "#072d23"; // card surface (ink-2 at 50% over ink): gaps and rings
-/** One-hue ramp from paper (OKLCH h 97, C 0.032), L 0.55 / 0.68 / 0.81 / 0.94. Passes the ordinal checks on SURFACE. */
-export const PAPER_RAMP = ["#77725d", "#9d9983", "#c6c1aa", "#f2edd5"] as const;
+const PAPER = "#f5f5f7"; // --color-fg
+const PAPER_DIM = "#a9a9b6"; // --color-fg-dim
+const FAINT = "#7d7d8a"; // --color-fg-faint
+const LINE = "#2a2a33"; // --color-line
+const ORANGE = "#c9f73a"; // --color-volt (accent: the latest point)
+const SURFACE = "#15151a"; // card surface: gaps and rings
+/** Neutral ramp, dark to light, for stacked series on the card surface. */
+export const PAPER_RAMP = ["#55555f", "#80808c", "#b4b4c0", "#f5f5f7"] as const;
 const WALK = PAPER_RAMP[1];
 
-const AXIS_TICK = { fill: FAINT, fontSize: 10, fontFamily: "IBM Plex Mono, ui-monospace, monospace" };
+const AXIS_TICK = { fill: FAINT, fontSize: 10, fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif" };
 
 // ---------- shared pieces ----------
 
 function TipBox({ title, rows }: { title: string; rows: { key: string; value: string; label: string; swatch?: string; line?: boolean }[] }) {
   return (
-    <div className="pointer-events-none rounded-[3px] border border-line bg-ink px-2.5 py-2 text-[12px] shadow-[0_6px_18px_rgba(0,0,0,0.35)]">
-      <div className="text-[10.5px] uppercase tracking-[0.12em] text-paper-faint">{title}</div>
+    <div className="pointer-events-none rounded-2xl border border-line bg-night px-2.5 py-2 text-[12px] shadow-[0_6px_18px_rgba(0,0,0,0.35)]">
+      <div className="text-[10.5px] uppercase tracking-[0.08em] text-fg-faint">{title}</div>
       {rows.map((r) => (
         <div key={r.key} className="mt-1 flex items-center gap-2">
-          {r.swatch && <span aria-hidden className={cx("shrink-0", r.line ? "h-[2px] w-3" : "h-2.5 w-2.5 rounded-[2px]")} style={{ background: r.swatch }} />}
-          <span className="font-semibold text-paper">{r.value}</span>
-          <span className="text-paper-dim">{r.label}</span>
+          {r.swatch && <span aria-hidden className={cx("shrink-0", r.line ? "h-[2px] w-3" : "h-2.5 w-2.5 rounded-lg")} style={{ background: r.swatch }} />}
+          <span className="font-semibold text-fg">{r.value}</span>
+          <span className="text-fg-dim">{r.label}</span>
         </div>
       ))}
     </div>
@@ -58,17 +58,17 @@ function rowOf<T>(props: TooltipContentProps): T | null {
 function TableView({ caption, head, rows }: { caption: string; head: string[]; rows: (string | number)[][] }) {
   return (
     <details className="group mt-2 border-t border-line/70">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center text-[11px] uppercase tracking-[0.14em] text-paper-faint [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center text-[11px] uppercase tracking-[0.08em] text-fg-faint [&::-webkit-details-marker]:hidden">
         <span className="group-open:hidden">Show table</span>
         <span className="hidden group-open:inline">Hide table</span>
       </summary>
       <div className="overflow-x-auto pb-2">
-        <table className="w-full border-collapse text-left text-[12px] tabular-nums text-paper-dim">
+        <table className="w-full border-collapse text-left text-[12px] tabular-nums text-fg-dim">
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr>
               {head.map((h) => (
-                <th key={h} scope="col" className="border-b border-line/70 py-1 pr-3 font-normal text-paper-faint">
+                <th key={h} scope="col" className="border-b border-line/70 py-1 pr-3 font-normal text-fg-faint">
                   {h}
                 </th>
               ))}
@@ -78,7 +78,7 @@ function TableView({ caption, head, rows }: { caption: string; head: string[]; r
             {rows.map((r, i) => (
               <tr key={i}>
                 {r.map((c, j) => (
-                  <td key={j} className={cx("border-b border-line/40 py-1 pr-3", j === 0 && "text-paper")}>
+                  <td key={j} className={cx("border-b border-line/40 py-1 pr-3", j === 0 && "text-fg")}>
                     {c}
                   </td>
                 ))}
@@ -92,7 +92,7 @@ function TableView({ caption, head, rows }: { caption: string; head: string[]; r
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <p className="m-0 py-6 text-center text-[13px] leading-snug text-paper-faint">{children}</p>;
+  return <p className="m-0 py-6 text-center text-[13px] leading-snug text-fg-faint">{children}</p>;
 }
 
 // ---------- e1RM small multiples ----------
@@ -102,27 +102,27 @@ function LiftMultiple({ s }: { s: E1rmSeries }) {
   const n = data.length;
   const delta = s.first != null && s.latest != null && n >= 2 ? s.latest - s.first : null;
   return (
-    <div className="flex min-w-0 flex-col rounded-[3px] border border-line/80 px-3 pb-2 pt-2.5">
-      <span className="truncate text-[12px] text-paper-dim">{s.name}</span>
+    <div className="flex min-w-0 flex-col rounded-2xl border border-line/80 px-3 pb-2 pt-2.5">
+      <span className="truncate text-[12px] text-fg-dim">{s.name}</span>
       {n === 0 ? (
         <>
-          <span className="mt-1 text-[13px] text-paper-faint">No sessions yet</span>
+          <span className="mt-1 text-[13px] text-fg-faint">No sessions yet</span>
           <div className="h-[56px]" aria-hidden />
         </>
       ) : (
         <>
-          <span className="mt-0.5 text-[18px] font-semibold leading-tight text-paper [font-variant-numeric:normal]">
+          <span className="mt-0.5 text-[18px] font-semibold leading-tight text-fg [font-variant-numeric:normal]">
             {fmtKg(s.latest!)}
-            <span className="ml-1 text-[11px] font-normal text-paper-dim">kg</span>
+            <span className="ml-1 text-[11px] font-normal text-fg-dim">kg</span>
           </span>
-          <span className="text-[11px] text-paper-faint">{delta == null ? "First point" : `${delta >= 0 ? "+" : "−"}${fmtKg(Math.abs(delta))} since first`}</span>
+          <span className="text-[11px] text-fg-faint">{delta == null ? "First point" : `${delta >= 0 ? "+" : "−"}${fmtKg(Math.abs(delta))} since first`}</span>
           <LineChart
             data={data}
             responsive
             style={{ width: "100%", height: 56 }}
             margin={{ top: 8, right: 6, bottom: 4, left: 6 }}
             accessibilityLayer
-            aria-label={`${s.name} e1RM, ${n} sessions`}
+            aria-label={`${s.name} estimated max, ${n} sessions`}
           >
             <XAxis dataKey="i" type="number" domain={n > 1 ? [0, n - 1] : [-1, 1]} hide />
             <YAxis domain={["dataMin - 1", "dataMax + 1"]} hide />
@@ -131,7 +131,7 @@ function LiftMultiple({ s }: { s: E1rmSeries }) {
               isAnimationActive={false}
               content={(p: TooltipContentProps) => {
                 const r = rowOf<(typeof data)[number]>(p);
-                return r ? <TipBox title={r.label} rows={[{ key: "v", value: `${fmtKg(r.e1rm)} kg`, label: "e1RM" }]} /> : null;
+                return r ? <TipBox title={r.label} rows={[{ key: "v", value: `${fmtKg(r.e1rm)} kg`, label: "est. max" }]} /> : null;
               }}
             />
             <Line
@@ -156,7 +156,7 @@ function E1rmCard({ series }: { series: E1rmSeries[] }) {
   const any = series.some((s) => s.points.length > 0);
   const longest = Math.max(0, ...series.map((s) => s.points.length));
   return (
-    <Card label="e1RM per main lift" meta="kg · estimated">
+    <Card label="Main lifts · estimated max" meta="kg">
       {!any ? (
         <Empty>Your first session with each main lift draws its first point.</Empty>
       ) : (
@@ -166,10 +166,10 @@ function E1rmCard({ series }: { series: E1rmSeries[] }) {
           ))}
         </div>
       )}
-      <p className="m-0 mt-2 text-[11.5px] leading-snug text-paper-faint">Estimated 1 rep max from your best set each session. Orange marks the latest.</p>
+      <p className="m-0 mt-2 text-[11.5px] leading-snug text-fg-faint">The heaviest single rep you could probably do, worked out from your best set each session. When this line climbs, you are getting stronger.</p>
       {any && (
         <TableView
-          caption="e1RM per main lift"
+          caption="Estimated max per main lift"
           head={["Session", ...series.map((s) => s.name)]}
           rows={Array.from({ length: longest }, (_, i) => [`${i + 1}`, ...series.map((s) => (s.points[i] ? `${fmtKg(s.points[i]!.e1rm)} · ${s.points[i]!.label}` : ""))])}
         />
@@ -195,11 +195,11 @@ function VolumeCard({ volume }: { volume: ChartData["volume"] }) {
   const any = rows.some((r) => Object.values(r.by_muscle).some((v) => (v ?? 0) > 0));
   const selRow = sel ? rows.find((r) => r.week_id === sel.week) : null;
   const selVal = selRow && sel ? (selRow.by_muscle[sel.muscle as keyof VolumeRow["by_muscle"]] ?? 0) : null;
-  const legend = [`<${fmtKg(band.min / 2)}`, `${fmtKg(band.min / 2)}–${band.min}`, `${fmtRange(band.min, band.max)} band`, `>${band.max}`];
+  const legend = [`<${fmtKg(band.min / 2)}`, `${fmtKg(band.min / 2)}–${band.min}`, `${fmtRange(band.min, band.max)} target`, `>${band.max}`];
   const cols = `76px repeat(${rows.length}, minmax(0, 1fr))`;
 
   const readout = (r: VolumeRow, m: string, v: number) => {
-    const where = r.band ? (v < r.band.min ? "below band" : v > r.band.max ? "above band" : "in band") : "no band this phase";
+    const where = r.band ? (v < r.band.min ? "below target" : v > r.band.max ? "above target" : "on target") : "no target yet";
     return `${muscleLabel(m)} · week of ${r.label} · ${fmtScore(v)} sets · ${where}`;
   };
 
@@ -209,12 +209,12 @@ function VolumeCard({ volume }: { volume: ChartData["volume"] }) {
         <Empty>Each week fills a column once you log sets.</Empty>
       ) : (
         <>
-          <p className="m-0 mb-2 min-h-[34px] text-[12px] leading-snug text-paper-dim" aria-live="polite">
+          <p className="m-0 mb-2 min-h-[34px] text-[12px] leading-snug text-fg-dim" aria-live="polite">
             {selRow && sel && selVal != null ? readout(selRow, sel.muscle, selVal) : "Tap a cell for the number."}
           </p>
           <div role="table" aria-label="Weekly fractional sets per muscle" className="flex flex-col gap-[2px]">
             <div role="row" className="grid items-end gap-[2px]" style={{ gridTemplateColumns: cols }}>
-              <span role="columnheader" className="text-[10px] text-paper-faint">
+              <span role="columnheader" className="text-[10px] text-fg-faint">
                 Week
               </span>
               {rows.map((r) => (
@@ -222,7 +222,7 @@ function VolumeCard({ volume }: { volume: ChartData["volume"] }) {
                   key={r.week_id}
                   role="columnheader"
                   aria-label={r.is_zero ? `Paused week of ${r.label}` : `Week ${r.training_week}, ${r.label}`}
-                  className={cx("text-center text-[10px] tabular-nums", r.is_current ? "text-paper" : "text-paper-faint")}
+                  className={cx("text-center text-[10px] tabular-nums", r.is_current ? "text-fg" : "text-fg-faint")}
                 >
                   {r.is_zero ? "·" : r.training_week}
                 </span>
@@ -230,7 +230,7 @@ function VolumeCard({ volume }: { volume: ChartData["volume"] }) {
             </div>
             {volume.muscles.map((m) => (
               <div key={m} role="row" className="grid items-center gap-[2px]" style={{ gridTemplateColumns: cols }}>
-                <span role="rowheader" className="truncate pr-1 text-[11.5px] text-paper-dim">
+                <span role="rowheader" className="truncate pr-1 text-[11.5px] text-fg-dim">
                   {muscleLabel(m)}
                 </span>
                 {rows.map((r) => {
@@ -244,7 +244,7 @@ function VolumeCard({ volume }: { volume: ChartData["volume"] }) {
                       role="cell"
                       aria-label={readout(r, m, v)}
                       onClick={() => setSel(on ? null : { week: r.week_id, muscle: m })}
-                      className={cx("h-[22px] min-w-0 rounded-[3px] outline-offset-1", b < 0 && "border border-line/70", on && "outline-2 outline-paper")}
+                      className={cx("h-[22px] min-w-0 rounded-2xl outline-offset-1", b < 0 && "border border-line/70", on && "outline-2 outline-fg")}
                       style={b >= 0 ? { background: PAPER_RAMP[b] } : undefined}
                     />
                   );
@@ -252,10 +252,10 @@ function VolumeCard({ volume }: { volume: ChartData["volume"] }) {
               </div>
             ))}
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-paper-dim" aria-label="Legend">
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-fg-dim" aria-label="Legend">
             {legend.map((l, i) => (
               <span key={l} className="inline-flex items-center gap-1.5">
-                <span aria-hidden className="h-2.5 w-2.5 rounded-[2px]" style={{ background: PAPER_RAMP[i] }} />
+                <span aria-hidden className="h-2.5 w-2.5 rounded-lg" style={{ background: PAPER_RAMP[i] }} />
                 {l}
               </span>
             ))}
@@ -299,23 +299,23 @@ function CardioCard({ rows }: { rows: CardioRow[] }) {
   const any = data.some((r) => r.total > 0);
   const top = Math.max(target * 1.15, ...data.map((r) => r.total));
   return (
-    <Card label="Cardio and walking" meta={`WHO ${target} min`}>
-      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-paper-dim" aria-label="Legend">
+    <Card label="Cardio and walking" meta={`Goal ${target} min a week`}>
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-fg-dim" aria-label="Legend">
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden className="h-2.5 w-2.5 rounded-[2px]" style={{ background: PAPER }} />
+          <span aria-hidden className="h-2.5 w-2.5 rounded-lg" style={{ background: PAPER }} />
           Cardio
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden className="h-2.5 w-2.5 rounded-[2px]" style={{ background: WALK }} />
+          <span aria-hidden className="h-2.5 w-2.5 rounded-lg" style={{ background: WALK }} />
           Walking
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden className="h-px w-3" style={{ background: PAPER_DIM }} />
-          WHO {target}
+          Goal {target}
         </span>
       </div>
       {!any ? (
-        <Empty>Cardio and walks stack up here week by week, against the WHO {target} minutes.</Empty>
+        <Empty>Cardio and walks stack up here week by week, toward {target} minutes.</Empty>
       ) : (
         <BarChart
           data={data}
@@ -338,7 +338,7 @@ function CardioCard({ rows }: { rows: CardioRow[] }) {
                 <TipBox
                   title={`Week of ${r.label}`}
                   rows={[
-                    { key: "t", value: `${Math.round(r.total)} of ${r.target}`, label: "WHO min" },
+                    { key: "t", value: `${Math.round(r.total)} of ${r.target}`, label: "min" },
                     { key: "c", value: `${Math.round(r.cardio)}`, label: "cardio", swatch: PAPER },
                     { key: "w", value: `${Math.round(r.walking)}`, label: "walking", swatch: WALK },
                   ]}
@@ -351,7 +351,7 @@ function CardioCard({ rows }: { rows: CardioRow[] }) {
           <Bar dataKey="walking" stackId="who" fill={WALK} maxBarSize={24} shape={WalkSeg} isAnimationActive={false} />
         </BarChart>
       )}
-      <p className="m-0 mt-2 text-[11.5px] leading-snug text-paper-faint">Moderate minutes. Hard interval minutes count double, as WHO counts them. Tap a week for its numbers.</p>
+      <p className="m-0 mt-2 text-[11.5px] leading-snug text-fg-faint">The health guideline is 150 easy minutes a week. Hard interval minutes count double. Tap a week for its numbers.</p>
       {any && (
         <TableView
           caption="Weekly cardio and walking minutes"
@@ -415,6 +415,117 @@ function CheckinCard({ rows }: { rows: CheckinRow[] }) {
         <TableView caption="Weekly check-in average" head={["Week", "Average"]} rows={data.map((r) => [r.label, r.avg == null ? "none" : fmtScore(r.avg)])} />
       )}
     </Card>
+  );
+}
+
+// ---------- body weight trend ----------
+
+/** Chart step of --color-body, inside the validator's dark band on the card surface. */
+const BODY = "#9079ee";
+const DAILY = PAPER_RAMP[1];
+
+export interface WeightSeriesPoint {
+  date: string;
+  weight: number | null;
+  avg: number | null;
+}
+
+const dayLabel = (date: string) => {
+  const [, m, d] = date.split("-").map(Number);
+  return `${d} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][(m ?? 1) - 1]}`;
+};
+
+/**
+ * Body weight over time: the 7 day trend as the one line that matters, daily weigh-ins as quiet dots behind it,
+ * the goal weight as a hairline. One axis (kg). Tooltip on tap or hover, table view below.
+ */
+export function WeightTrendChart({ series, goal }: { series: WeightSeriesPoint[]; goal: number | null }) {
+  const data = series.map((p, i) => ({ ...p, i, label: dayLabel(p.date) }));
+  const weighed = data.filter((p) => p.weight != null);
+  if (!weighed.length) return <Empty>Your first weigh-in draws the first point. After a few mornings the trend line appears.</Empty>;
+
+  const values = data.flatMap((p) => [p.weight, p.avg]).filter((v): v is number => v != null);
+  if (goal != null) values.push(goal);
+  const lo = Math.floor(Math.min(...values) - 0.6);
+  const hi = Math.ceil(Math.max(...values) + 0.6);
+  const n = data.length;
+  const lastAvg = [...data].reverse().find((p) => p.avg != null) ?? null;
+  const dense = n > 45;
+  const ticks = n <= 1 ? [0] : n < 8 ? [0, n - 1] : [0, Math.round((n - 1) / 2), n - 1];
+
+  return (
+    <>
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-fg-dim" aria-label="Legend">
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="h-[2px] w-3.5 rounded-full" style={{ background: BODY }} />
+          7 day trend
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: DAILY }} />
+          Daily weigh-in
+        </span>
+        {goal != null && (
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden className="h-px w-3.5" style={{ background: PAPER_DIM }} />
+            Goal {fmtKg(goal)}
+          </span>
+        )}
+      </div>
+      <LineChart
+        data={data}
+        responsive
+        style={{ width: "100%", height: 196 }}
+        margin={{ top: 10, right: 10, bottom: 0, left: -18 }}
+        accessibilityLayer
+        aria-label={`Body weight, ${weighed.length} weigh-ins over ${n} days`}
+      >
+        <CartesianGrid vertical={false} stroke={LINE} strokeWidth={1} />
+        <XAxis
+          dataKey="i"
+          type="number"
+          domain={n > 1 ? [0, n - 1] : [-1, 1]}
+          ticks={ticks}
+          tickFormatter={(i: number) => data[i]?.label ?? ""}
+          tick={AXIS_TICK}
+          tickLine={false}
+          axisLine={{ stroke: LINE }}
+          tickMargin={6}
+        />
+        <YAxis domain={[lo, hi]} tick={AXIS_TICK} tickLine={false} axisLine={false} tickCount={4} allowDecimals={false} width={44} />
+        {goal != null && <ReferenceLine y={goal} stroke={PAPER_DIM} strokeWidth={1} />}
+        <Tooltip
+          cursor={{ stroke: FAINT, strokeWidth: 1 }}
+          isAnimationActive={false}
+          content={(p: TooltipContentProps) => {
+            const r = rowOf<(typeof data)[number]>(p);
+            if (!r || (r.weight == null && r.avg == null)) return null;
+            return (
+              <TipBox
+                title={r.label}
+                rows={[
+                  ...(r.avg != null ? [{ key: "avg", value: `${r.avg.toFixed(1)} kg`, label: "trend", swatch: BODY, line: true }] : []),
+                  ...(r.weight != null ? [{ key: "w", value: `${r.weight.toFixed(1)} kg`, label: "that morning", swatch: DAILY }] : []),
+                ]}
+              />
+            );
+          }}
+        />
+        <Line
+          dataKey="weight"
+          stroke="none"
+          dot={{ r: dense ? 2.5 : 4, fill: DAILY, stroke: SURFACE, strokeWidth: dense ? 1 : 2 }}
+          activeDot={{ r: 5, fill: PAPER, stroke: SURFACE, strokeWidth: 2 }}
+          isAnimationActive={false}
+        />
+        <Line dataKey="avg" stroke={BODY} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" dot={false} activeDot={{ r: 4, fill: BODY, stroke: SURFACE, strokeWidth: 2 }} connectNulls isAnimationActive={false} />
+        {lastAvg && <ReferenceDot x={lastAvg.i} y={lastAvg.avg!} r={4.5} fill={BODY} stroke={SURFACE} strokeWidth={2} />}
+      </LineChart>
+      <TableView
+        caption="Body weight by day"
+        head={["Day", "Weigh-in", "Trend"]}
+        rows={[...weighed].reverse().map((p) => [p.label, `${p.weight!.toFixed(1)} kg`, p.avg != null ? `${p.avg.toFixed(1)} kg` : ""])}
+      />
+    </>
   );
 }
 

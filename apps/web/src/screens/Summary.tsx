@@ -42,10 +42,10 @@ export function SummaryScreen() {
   } else {
     body = (
       <Card label="Summary">
-        <p className="text-[15px] leading-snug text-paper">
+        <p className="text-[15px] leading-snug text-fg">
           {error ? "The summary could not be built right now. Your sets are saved." : "This session is not on this phone."}
         </p>
-        {error && <p className="mt-2 break-words text-[11px] text-paper-faint">{error.message}</p>}
+        {error && <p className="mt-2 break-words text-[11px] text-fg-faint">{error.message}</p>}
         <Button variant="primary" size="lg" block className="mt-4" onClick={done}>
           Back to Today
         </Button>
@@ -56,7 +56,7 @@ export function SummaryScreen() {
   return (
     <>
       <ShellTitle>
-        <span className="text-paper">Summary</span>
+        <span className="text-fg-dim">Summary</span>
       </ShellTitle>
       <Page className="gap-4 pb-4">{body}</Page>
     </>

@@ -4,7 +4,7 @@
  */
 import { vi } from "vitest";
 import type { Decision, EngineConfig, ProgramConfig, Settings } from "@gym/schema";
-import type { EngineContext, EngineState, PlanOptions, SessionSummary } from "@gym/engine";
+import type { BodyInput, BodyState, EngineContext, EngineState, PlanOptions, SessionSummary } from "@gym/engine";
 import engineJson from "../../../../config/engine.json";
 import programJson from "../../../../config/program.json";
 
@@ -28,6 +28,18 @@ export function makeSettings(now: string): Settings {
     sound: true,
     evening_hour: 19,
     week_killers: ["work_peaks", "travel", "evenings"],
+    sex: null,
+    birth_year: null,
+    height_cm: null,
+    job_activity: "desk",
+    goal: "cut",
+    cut_rate_pct: 0.5,
+    goal_weight_kg: null,
+    kcal_override: null,
+    protein_override_g: null,
+    steps_target: 8000,
+    body_adjust_since: null,
+    body_adjust_base_kcal: 0,
     updated_at: now,
     deleted_at: null,
   };
@@ -73,6 +85,9 @@ export const engineMock = {
         cardio: { kind: "easy" },
         sessions_seen: ctx.history.sessions.length,
       }) as unknown as EngineState,
+  ),
+  computeBody: vi.fn(
+    (input: BodyInput) => ({ today: input.now.slice(0, 10), logs_seen: input.bodyLogs.length }) as unknown as BodyState,
   ),
   planSession: vi.fn((_ctx: EngineContext, _opts: PlanOptions) => ({ exercises: [] })),
   planCardio: vi.fn(() => ({ kind: "easy" })),

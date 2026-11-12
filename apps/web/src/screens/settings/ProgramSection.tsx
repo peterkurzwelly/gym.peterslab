@@ -15,9 +15,9 @@ const MODALITY = [
 ] as const;
 
 const KILLERS: { value: WeekKiller; label: string; description: string }[] = [
-  { value: "work_peaks", label: "Work peaks", description: "Lead with ★ 30 min when the floor is at risk." },
+  { value: "work_peaks", label: "Work peaks", description: "Suggest the 30 min version when the week is running out." },
   { value: "travel", label: "Travel", description: "Keep the travel version one tap away." },
-  { value: "evenings", label: "Evenings", description: "Lead with ★ 30 min after the evening hour." },
+  { value: "evenings", label: "Evenings", description: "Suggest the 30 min version after the evening hour." },
   { value: "low_energy", label: "Low energy", description: "The check-in already trims the session on low days." },
 ];
 
@@ -55,7 +55,7 @@ export function ProgramSection({ index, settings, defaults, exercises }: Program
   };
 
   return (
-    <Section id="program" index={index} title="Program" right={<span className="text-paper-faint">Block {settings.block_number}</span>}>
+    <Section id="program" index={index} title="Program" right={<span className="text-fg-faint">Block {settings.block_number}</span>}>
       <Card>
         <div className="flex flex-col gap-4">
           <Field label="Block start" htmlFor={dateId} help="Week 1 is the Monday to Sunday week of this date.">
@@ -105,7 +105,7 @@ export function ProgramSection({ index, settings, defaults, exercises }: Program
 
       <Card>
         <div className="flex flex-col gap-4">
-          <Field label="Intervals on" help="Bike or rower keeps the 4x4 easy on the legs before A and B.">
+          <Field label="Intervals on" help="Bike or rower keeps the hard intervals easy on the legs before sessions A and B.">
             <SegmentedControl label="Interval modality" options={MODALITY} value={settings.interval_modality} onChange={(interval_modality) => void updateSettings({ interval_modality })} />
           </Field>
 
@@ -133,9 +133,9 @@ export function ProgramSection({ index, settings, defaults, exercises }: Program
 
           <Rule />
 
-          <Field label="Evening hour" help={eveningOn ? `From ${fmtHour(settings.evening_hour!)} Today leads with the ★ 30 min version.` : "Off. Today leads with the full session at any hour."}>
+          <Field label="Evening hour" help={eveningOn ? `From ${fmtHour(settings.evening_hour!)} Today suggests the 30 min version.` : "Off. Today leads with the full session at any hour."}>
             <Toggle
-              label="Lead with ★ 30 min in the evening"
+              label="Suggest 30 min in the evening"
               checked={eveningOn}
               onChange={(on) => void updateSettings({ evening_hour: on ? defaults.eveningDefault : null })}
               description={!killers.has("evenings") && eveningOn ? "Turn on Evenings above for this to apply." : undefined}

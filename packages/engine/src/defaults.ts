@@ -79,6 +79,7 @@ export function loadDefaults(): Defaults {
 /**
  * Settings for a fresh install (block starts program.default_start_date, no limitations, start_pct from config).
  * evening_hour 19 and week_killers work_peaks, travel, evenings are Peter's answers (DECISIONS D17).
+ * Body and fuel: no profile yet, goal cut at the config default rate, steps target from config.
  */
 export function defaultSettings(config: EngineConfig, program: ProgramConfig, nowIso: string): Settings {
   return {
@@ -97,6 +98,18 @@ export function defaultSettings(config: EngineConfig, program: ProgramConfig, no
     sound: true,
     evening_hour: 19,
     week_killers: ["work_peaks", "travel", "evenings"],
+    sex: null,
+    birth_year: null,
+    height_cm: null,
+    job_activity: "desk",
+    goal: "cut",
+    cut_rate_pct: config.body.cut_rate.default_pct,
+    goal_weight_kg: null,
+    kcal_override: null,
+    protein_override_g: null,
+    steps_target: config.body.steps_target_default,
+    body_adjust_since: null,
+    body_adjust_base_kcal: 0,
     updated_at: nowIso,
     deleted_at: null,
   };

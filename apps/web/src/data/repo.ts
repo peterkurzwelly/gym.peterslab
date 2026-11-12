@@ -6,8 +6,10 @@
 import { ulid } from "ulid";
 import type { z } from "zod";
 import {
+  BODY_LIMITS,
   Exercise,
   TableSchemas,
+  type BodyLog,
   type CardioIntensity,
   type CardioLog,
   type CardioModality,
@@ -421,6 +423,62 @@ export async function repairWeek(weekId: string, repaired = true): Promise<Train
   return write(["training_week"], (w) =>
     w.put("training_week", { id: `wk_${start}`, start_date: start, repaired, deleted_at: null }),
   );
+}
+
+// ---------------- body and fuel ----------------
+
+const BODY_FIELDS = ["weight_kg", "waist_cm", "steps", "protein_g", "kcal", "sleep_h", "note"] as const;
+type BodyValues = Pick<BodyLog, (typeof BODY_FIELDS)[number]>;
+
+export type BodyLogPatch = Partial<BodyValues>;
+/** The fields that add up over a day. */
+export type BodyLogCounter = "protein_g" | "kcal" | "steps";
+
+/** The logged values of a live row; everything null for a missing or soft deleted one (a deleted day starts over). */
+function bodyValues(row: BodyLog | undefined): BodyValues {
+  const live = row && !row.deleted_at ? row : undefined;
+  return {
+    weight_kg: live?.weight_kg ?? null,
+    waist_cm: live?.waist_cm ?? null,
+    steps: live?.steps ?? null,
+    protein_g: live?.protein_g ?? null,
+    kcal: live?.kcal ?? null,
+    sleep_h: live?.sleep_h ?? null,
+    note: live?.note ?? null,
+  };
+}
+
+/**
+ * Upserts the body log for a local date (id "bd_YYYY-MM-DD"). Fields in the patch replace the stored value
+ * (null clears it); fields left out keep theirs. Values outside the schema ranges throw and nothing is written.
+ */
+export async function saveBodyLog(date: string, patch: BodyLogPatch): Promise<BodyLog> {
+  const id = `bd_${date}`;
+  return write(["body_log"], async (w) => {
+    const values: Record<string, unknown> = bodyValues(await db.body_log.get(id));
+    for (const field of BODY_FIELDS) {
+      if (patch[field] !== undefined) values[field] = patch[field];
+    }
+    // An emptied note field is no note.
+    if (typeof values.note === "string") values.note = values.note.trim() || null;
+    return w.put("body_log", { ...(values as BodyValues), id, date, deleted_at: null });
+  });
+}
+
+/**
+ * Adds delta to the day's running total of protein, kcal or steps (a missing value counts as 0) and stores it.
+ * The result never goes below 0 or above the schema maximum, so a quick add button cannot fail. Steps stay whole.
+ */
+export async function addToBodyLog(date: string, field: BodyLogCounter, delta: number): Promise<BodyLog> {
+  if (!Number.isFinite(delta)) throw new Error(`addToBodyLog: delta must be a number, got ${delta}`);
+  const id = `bd_${date}`;
+  return write(["body_log"], async (w) => {
+    const values = bodyValues(await db.body_log.get(id));
+    const sum = (values[field] ?? 0) + delta;
+    const rounded = field === "steps" ? Math.round(sum) : Math.round(sum * 100) / 100;
+    values[field] = Math.min(BODY_LIMITS[field].max, Math.max(0, rounded));
+    return w.put("body_log", { ...values, id, date, deleted_at: null });
+  });
 }
 
 // ---------------- decisions ----------------

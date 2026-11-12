@@ -5,7 +5,7 @@
  */
 import type { CardioPlan } from "@gym/engine";
 import type { CardioModality, Session } from "@gym/schema";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -23,6 +23,7 @@ import { discardSession, finishSession, logCardio, startCardioSession } from "..
 import { fmtApproxMin, fmtClock } from "../../lib/format";
 import { markSessionOpen } from "../../lib/updatePolicy";
 import { readCardioModality, readIntervalRun, writeCardioModality, writeIntervalRun } from "./storage";
+import { plain } from "../../lib/plain";
 
 export interface CardioPanelProps {
   plan: CardioPlan;
@@ -32,17 +33,22 @@ export interface CardioPanelProps {
   /** Close without logging. */
   onClose: () => void;
   onSaved: (sessionId: string) => void;
+  /** The screen around the panel already says what the session is: show only the timer and the log form. */
+  bare?: boolean;
   className?: string;
 }
 
 const round = (n: number) => Math.max(1, Math.round(n));
 
-export function CardioPanel({ plan, session, sound, onClose, onSaved, className }: CardioPanelProps) {
+export function CardioPanel({ plan, session, sound, onClose, onSaved, bare = false, className }: CardioPanelProps) {
   const [stage, setStage] = useState<"timer" | "log">("timer");
   const [result, setResult] = useState<IntervalResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  // A retried Save after a half done one: reuse the session it made and do not log the minutes twice.
+  const made = useRef<Session | null>(null);
+  const loggedFor = useRef<string | null>(null);
   const sessionId = session?.id ?? null;
   // A run from before a remount or reload of this panel, for this session only.
   const storedRun = useMemo(() => readIntervalRun(sessionId), [sessionId]);
@@ -79,16 +85,19 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
     setSaving(true);
     setNotice(null);
     try {
-      const s = session ?? (await startCardioSession());
-      await logCardio({
-        sessionId: s.id,
-        modality: v.modality,
-        minutes: v.minutes,
-        hardMinutes: v.intensity === "hard" ? (v.hard_minutes ?? (hard ? plan.hard_minutes : null)) : 0,
-        intensity: v.intensity,
-        avgHr: v.avg_hr,
-        source: result ? "timer" : "manual",
-      });
+      const s = session ?? made.current ?? (made.current = await startCardioSession());
+      if (loggedFor.current !== s.id) {
+        await logCardio({
+          sessionId: s.id,
+          modality: v.modality,
+          minutes: v.minutes,
+          hardMinutes: v.intensity === "hard" ? (v.hard_minutes ?? (hard ? plan.hard_minutes : null)) : 0,
+          intensity: v.intensity,
+          avgHr: v.avg_hr,
+          source: result ? "timer" : "manual",
+        });
+        loggedFor.current = s.id;
+      }
       const fin = await finishSession(s.id);
       if (fin.error) console.warn("[today] cardio decisions not stored", fin.error);
       writeCardioModality(v.modality);
@@ -117,24 +126,28 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
   return (
     <Card
       className={className}
-      label={`Cardio · ${plan.counts_as === "target" ? "counts toward target" : "bonus"}`}
+      label={bare ? (stage === "log" ? "Log it" : "Timer") : `Cardio · ${plan.counts_as === "target" ? "counts toward target" : "bonus"}`}
       meta={
-        <button type="button" aria-label={session ? "Discard cardio" : "Close cardio"} onClick={onX} className="-mr-3 -my-1 grid h-11 w-11 place-items-center text-paper-dim active:text-paper">
+        <button type="button" aria-label={session ? "Discard cardio" : "Close cardio"} onClick={onX} className="-mr-3 -my-1 grid h-11 w-11 place-items-center text-fg-dim active:text-fg">
           <CloseIcon size={18} />
         </button>
       }
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[16px] text-paper">{describeCardio(plan)}</p>
-        <span className="shrink-0 text-[13px] text-paper-dim">{fmtApproxMin(plan.total_min)}</span>
-      </div>
-      <p className="mt-1 text-[12px] leading-snug text-paper-faint">{plan.reason}</p>
-      {hard && <SpacingWarnings warnings={plan.warnings} className="mt-3" />}
+      {!bare && (
+        <>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[16px] text-fg">{describeCardio(plan)}</p>
+            <span className="shrink-0 text-[13px] text-fg-dim">{fmtApproxMin(plan.total_min)}</span>
+          </div>
+          <p className="mt-1 text-[12px] leading-snug text-fg-faint">{plain(plan.reason)}</p>
+          {hard && <SpacingWarnings warnings={plan.warnings} className="mt-3" />}
+        </>
+      )}
 
       {asking && (
-        <div className="mt-4 rounded-[3px] border border-line bg-ink-2/50 px-4 py-3" role="group" aria-label="Discard cardio">
-          <p className="m-0 text-[14px] leading-snug text-paper">
-            Discard this cardio? <span className="text-paper-dim">The timer stops and nothing is logged.</span>
+        <div className="mt-4 rounded-2xl border border-line bg-card/50 px-4 py-3" role="group" aria-label="Discard cardio">
+          <p className="m-0 text-[14px] leading-snug text-fg">
+            Discard this cardio? <span className="text-fg-dim">The timer stops and nothing is logged.</span>
           </p>
           <div className="mt-3 flex gap-2">
             <Button variant="secondary" size="md" className="flex-1" onClick={() => void close()}>
@@ -150,7 +163,7 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
       {stage === "timer" ? (
         <>
           <IntervalTimer
-            className="mt-5"
+            className={bare ? "mt-1" : "mt-5"}
             plan={plan}
             sound={sound}
             initialRun={storedRun}
@@ -170,7 +183,7 @@ export function CardioPanel({ plan, session, sound, onClose, onSaved, className 
       ) : (
         <div className="mt-5">
           {result && (
-            <p className="mb-3 text-[13px] tabular-nums text-paper-dim">
+            <p className="mb-3 text-[13px] tabular-nums text-fg-dim">
               Timer · {fmtClock(result.minutes * 60)} total
               {result.hardMinutes > 0 ? ` · ${result.hardMinutes} min hard` : ""}
             </p>

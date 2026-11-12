@@ -24,6 +24,10 @@ export { ENGINE_VERSION, loadDefaults, defaultSettings } from "./defaults";
 // computeState(ctx): everything the UI needs in one call. Pure and deterministic.
 export { computeState } from "./state";
 
+// computeBody(input): body and fuel in one call (weight trend, calorie / protein / steps targets, pace,
+//   weekly adaptive adjustment). Separate from computeState: it reads body logs and settings only. ENGINE_RULES 10.
+export { computeBody } from "./body";
+
 /** Plan a session (any day code and mode) as of opts.at ?? ctx.now. */
 export function planSession(ctx: EngineContext, opts: PlanOptions): SessionPlan {
   return buildPlan(analyze(ctx, { at: opts.at, excludeSessionId: opts.sessionId }), opts);

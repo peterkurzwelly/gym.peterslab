@@ -16,7 +16,7 @@ export interface SegmentedControlProps<T extends string> {
 
 export function SegmentedControl<T extends string>({ options, value, onChange, label, className }: SegmentedControlProps<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className={cx("flex rounded-[3px] border border-line p-[3px]", className)}>
+    <div role="radiogroup" aria-label={label} className={cx("flex rounded-[16px] bg-card p-1", className)}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -27,8 +27,8 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cx(
-              "gym-press min-h-11 flex-1 rounded-[2px] px-3 font-mono text-[13px] uppercase tracking-[0.08em] transition-colors duration-100 motion-reduce:transition-none",
-              on ? "bg-paper font-semibold text-ink" : "text-paper-dim active:bg-ink-3",
+              "gym-press min-h-11 flex-1 whitespace-nowrap rounded-[12px] px-2 text-[14px] font-semibold",
+              on ? "bg-fg text-night" : "text-fg-dim active:bg-raise",
             )}
           >
             {o.label}

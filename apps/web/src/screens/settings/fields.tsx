@@ -21,10 +21,10 @@ export function Field({ label, help, htmlFor, children, className }: { label: Re
   return (
     <div className={cx("flex flex-col gap-2", className)}>
       <div>
-        <Caption {...(htmlFor ? { htmlFor } : {})} className="block text-[11px] uppercase tracking-[0.14em] text-paper-faint">
+        <Caption {...(htmlFor ? { htmlFor } : {})} className="block text-[11px] uppercase tracking-[0.08em] text-fg-faint">
           {label}
         </Caption>
-        {help && <p className="mt-1 text-[12.5px] leading-snug text-paper-dim">{help}</p>}
+        {help && <p className="mt-1 text-[12.5px] leading-snug text-fg-dim">{help}</p>}
       </div>
       {children}
     </div>
@@ -36,7 +36,7 @@ export function TextInput({ className, ...rest }: InputHTMLAttributes<HTMLInputE
   return (
     <input
       className={cx(
-        "h-12 w-full min-w-0 rounded-[3px] border border-line bg-ink px-3 font-mono text-[16px] text-paper outline-none placeholder:text-paper-faint focus:border-paper/60",
+        "h-12 w-full min-w-0 rounded-2xl border border-line bg-night px-3 text-[16px] text-fg outline-none placeholder:text-fg-faint focus:border-fg/60",
         className,
       )}
       {...rest}
@@ -50,7 +50,7 @@ export const Rule = () => <div aria-hidden className="h-px bg-line/80" />;
 /** Calm one line result under an action. ok = it worked; otherwise neutral. Never red, and green stays reserved for the week. */
 export function Note({ children, ok, className }: { children: ReactNode; ok?: boolean; className?: string }) {
   return (
-    <p role="status" className={cx("text-[13px] leading-snug", ok ? "text-paper" : "text-paper-dim", className)}>
+    <p role="status" className={cx("text-[13px] leading-snug", ok ? "text-fg" : "text-fg-dim", className)}>
       {ok && <span className="mr-1.5">✓</span>}
       {children}
     </p>
@@ -61,8 +61,8 @@ export function Note({ children, ok, className }: { children: ReactNode; ok?: bo
 export function Readout({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="flex min-h-7 items-baseline justify-between gap-3 text-[13px]">
-      <span className="shrink-0 text-paper-faint">{label}</span>
-      <span className="min-w-0 text-right text-paper">{children}</span>
+      <span className="shrink-0 text-fg-faint">{label}</span>
+      <span className="min-w-0 text-right text-fg">{children}</span>
     </div>
   );
 }

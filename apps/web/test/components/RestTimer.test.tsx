@@ -66,6 +66,18 @@ describe("RestTimer", () => {
     expect(document.querySelector(".gym-flash")).toBeNull();
   });
 
+  it("says what comes next, and alert={false} leaves the beep and flash to the app wide watcher", () => {
+    const vibrate = vi.fn();
+    const onDone = vi.fn();
+    vi.stubGlobal("navigator", { ...navigator, vibrate });
+    render(<RestTimer startedAt={T0} endsAt={T0 + 2_000} label="Bench press · set 2" alert={false} onAdd={() => {}} onSkip={() => {}} onDone={onDone} sound={false} />);
+    expect(screen.getByText("Rest · then Bench press · set 2")).toBeTruthy();
+    advance(2_000);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(vibrate).not.toHaveBeenCalled();
+    expect(document.querySelector(".gym-flash")).toBeNull();
+  });
+
   it("+30 s and skip call back; a new endsAt re-arms onDone", () => {
     const onAdd = vi.fn();
     const onSkip = vi.fn();

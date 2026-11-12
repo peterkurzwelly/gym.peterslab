@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Settings } from "@gym/schema";
+import { setClock } from "../../src/data/clock";
 import { db } from "../../src/data/db";
 import * as repo from "../../src/data/repo";
 import { exportLocal } from "../../src/data/backup";
@@ -29,15 +30,66 @@ beforeEach(async () => {
 
 afterEach(() => {
   cleanup();
+  setClock(null);
   vi.unstubAllGlobals();
 });
 
+describe("SettingsScreen · You", () => {
+  it("is titled You and jumps to every section", async () => {
+    const scrolled: string[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this.id);
+    };
+    await renderSettings();
+    expect(screen.getByRole("heading", { level: 1, name: "You" })).toBeTruthy();
+    const jumps = within(screen.getByRole("navigation", { name: "Settings sections" })).getAllByRole("button");
+    expect(jumps.map((b) => b.textContent)).toEqual(["Goal", "Sync", "Program", "Timers", "Equipment", "Data", "About"]);
+    await screen.findByRole("region", { name: "Your goal" });
+    for (const b of jumps) fireEvent.click(b);
+    // Every chip finds its section on the page.
+    expect(scrolled).toEqual(["goal", "sync", "program", "timers", "equipment", "data", "about"]);
+  });
+
+  it("the goal section asks for the four numbers first and opens the profile sheet", async () => {
+    await renderSettings();
+    const goal = await screen.findByRole("region", { name: "Your goal" });
+    expect(within(goal).getByRole("heading", { level: 2, name: "Lose fat, keep muscle" })).toBeTruthy();
+    expect(within(goal).getByText(/^Add four numbers and the app works out your calories, protein and steps/)).toBeTruthy();
+    expect(within(goal).queryByText("Calories")).toBeNull();
+    fireEvent.click(within(goal).getByRole("button", { name: /^Set up/ }));
+    expect(await screen.findByRole("dialog", { name: "You and your goal" })).toBeTruthy();
+  });
+
+  it("with the profile filled in, the goal section shows who you are and the daily targets", async () => {
+    await repo.updateSettings({ sex: "male", birth_year: 1986, height_cm: 180, goal_weight_kg: 80 });
+    setClock(() => "2026-11-09T07:00:00.000Z");
+    await repo.saveBodyLog("2026-11-09", { weight_kg: 85 });
+    await renderSettings();
+    const goal = await screen.findByRole("region", { name: "Your goal" });
+    expect(await within(goal).findByText(/^Born 1986 · 180 cm · 85\.0 kg · desk job · 0\.5% of body weight a week · goal 80\.0 kg$/)).toBeTruthy();
+    // 2 g of protein per kg, the default 8 000 steps, and calories from the engine.
+    expect(within(goal).getByText("Protein").parentElement!.textContent).toBe("Protein170g a day");
+    expect(within(goal).getByText("Steps").parentElement!.textContent).toMatch(/^Steps8\s000a day$/);
+    expect(within(goal).getByText("Calories").parentElement!.textContent).toMatch(/^Calories\d\s\d{3}kcal a day$/);
+    expect(within(goal).queryByRole("button", { name: /^Set up/ })).toBeNull();
+
+    // Changing the goal goes through the same sheet and is stored.
+    fireEvent.click(within(goal).getByRole("button", { name: "Change goal or details" }));
+    const sheet = await screen.findByRole("dialog", { name: "You and your goal" });
+    fireEvent.click(within(within(sheet).getByRole("radiogroup", { name: "Goal" })).getByRole("radio", { name: "Build" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+    await waitFor(async () => expect((await settingsRow()).goal).toBe("gain"));
+    expect(await within(goal).findByRole("heading", { level: 2, name: "Build muscle" })).toBeTruthy();
+  });
+});
+
 describe("SettingsScreen", () => {
-  it("shows all six sections and the four main lifts first", async () => {
+  it("shows the goal and all six sections, with the four main lifts first", async () => {
     await renderSettings();
     for (const name of ["Sync", "Program", "Timers and sound", "Equipment", "Data", "About"]) {
       expect(screen.getByRole("region", { name })).toBeTruthy();
     }
+    expect(await screen.findByRole("region", { name: "Your goal" })).toBeTruthy();
     const program = screen.getByRole("region", { name: "Program" });
     const lifts = within(program)
       .getAllByRole("button", { name: /: not set\. Edit$/ })
@@ -92,11 +144,13 @@ describe("SettingsScreen", () => {
 
   it("turns the evening hour off and back on", async () => {
     await renderSettings();
-    const toggle = screen.getByRole("switch", { name: /Lead with ★ 30 min in the evening/ });
+    const toggle = screen.getByRole("switch", { name: /Suggest 30 min in the evening/ });
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(toggle);
     await waitFor(async () => expect((await settingsRow()).evening_hour).toBeNull());
-    fireEvent.click(screen.getByRole("switch", { name: /Lead with ★ 30 min in the evening/ }));
+    await waitFor(() => expect(screen.getByRole("switch", { name: /Suggest 30 min in the evening/ }).getAttribute("aria-checked")).toBe("false"));
+    expect(screen.getByText("Off. Today leads with the full session at any hour.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("switch", { name: /Suggest 30 min in the evening/ }));
     await waitFor(async () => expect((await settingsRow()).evening_hour).toBe(19));
     fireEvent.click(await screen.findByRole("button", { name: "Increase from" }));
     await waitFor(async () => expect((await settingsRow()).evening_hour).toBe(20));

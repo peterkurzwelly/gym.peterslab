@@ -1,11 +1,13 @@
 /**
- * Progress tab (SPEC 4.3): weeks without a zero, four headline numbers, charts, engine flags and the Sunday review.
+ * Progress tab: leaner (weight trend and habits), stronger (headline numbers and charts), consistent (weeks trained),
+ * engine flags and the weekly review.
  * Charts are lazy loaded so Recharts never touches the Today bundle or the first paint here.
  */
 import { lazy, Suspense, useMemo } from "react";
-import { Card, Page, Pill, SectionHeader, ShellTitle, Skeleton } from "../components";
-import { useEngine } from "../data";
+import { Card, Page, PageTitle, Pill, SectionHeader, ShellTitle, Skeleton } from "../components";
+import { useBody, useEngine, useSettings } from "../data";
 import { weekdayOf } from "./plan/booking";
+import { BodySection } from "./progress/Body";
 import { FlagsCard } from "./progress/Flags";
 import { Kpis } from "./progress/Kpis";
 import { buildChartData, mainLifts } from "./progress/model";
@@ -26,6 +28,8 @@ function ChartsFallback() {
 
 export function ProgressScreen() {
   const { ready, state, ctx, error } = useEngine();
+  const body = useBody();
+  const settings = useSettings();
   const lifts = useMemo(() => (ctx ? mainLifts(ctx) : []), [ctx]);
   const charts = useMemo(() => (state && ctx ? buildChartData(state, ctx, lifts) : null), [state, ctx, lifts]);
 
@@ -49,69 +53,73 @@ export function ProgressScreen() {
   const review = <SundayReview state={state} ctx={ctx} prominent={sunday} mainLiftIds={lifts.map((l) => l.exercise_id)} />;
 
   return (
-    <Page className="gap-6">
+    <Page className="gap-7">
       <ShellTitle>
-        <span className="text-paper">Progress</span>
-        <span className="text-paper-faint">
-          {" "}
-          · {state.streak.weeks_without_zero} of {state.block.block_weeks}
+        <span className="text-fg-dim">
+          Week {state.current_week.training_week} of {state.block.block_weeks}
         </span>
       </ShellTitle>
+      <PageTitle eyebrow="Leaner · stronger · consistent">Progress</PageTitle>
 
       {sunday && (
-        <section className="flex flex-col gap-3" aria-label="Sunday review">
+        <section className="flex flex-col gap-3" aria-label="Weekly review">
           {review}
         </section>
       )}
 
+      {body && settings && (
+        <section className="flex flex-col gap-3" aria-labelledby="progress-body">
+          <SectionHeader>
+            <span id="progress-body">Leaner</span>
+          </SectionHeader>
+          <BodySection body={body} settings={settings} />
+        </section>
+      )}
+
+      <section className="flex flex-col gap-3" aria-labelledby="progress-charts">
+        <SectionHeader right={`Week ${state.current_week.training_week}`}>
+          <span id="progress-charts">Stronger</span>
+        </SectionHeader>
+        <Kpis state={state} ctx={ctx} e1rm={charts.e1rm} />
+        {charts.has_history ? (
+          <Suspense fallback={<ChartsFallback />}>
+            <ProgressCharts data={charts} />
+          </Suspense>
+        ) : (
+          <Card label="Charts" meta="After the first workouts">
+            <p className="m-0 text-[13.5px] leading-snug text-fg-dim">Nothing to draw yet, and that is fine. These fill in as you train:</p>
+            <ul className="m-0 mt-2 list-none p-0 text-[13.5px] leading-relaxed text-fg">
+              <li>· Estimated max on your main lifts</li>
+              <li>· Weekly sets per muscle</li>
+              <li>· Cardio and walking minutes</li>
+              <li>· How you felt, week by week</li>
+            </ul>
+          </Card>
+        )}
+      </section>
+
       <section className="flex flex-col gap-3" aria-labelledby="progress-streak">
-        <SectionHeader index="01">
-          <span id="progress-streak">Consistency</span>
+        <SectionHeader>
+          <span id="progress-streak">Consistent</span>
         </SectionHeader>
         <StreakCard state={state} />
         <RepairsCard state={state} ctx={ctx} />
         <TotalsCard state={state} />
       </section>
 
-      <section className="flex flex-col gap-3" aria-labelledby="progress-week">
-        <SectionHeader index="02" right={`Week ${state.current_week.training_week}`}>
-          <span id="progress-week">This week</span>
-        </SectionHeader>
-        <Kpis state={state} ctx={ctx} e1rm={charts.e1rm} />
-      </section>
-
-      <section className="flex flex-col gap-3" aria-labelledby="progress-charts">
-        <SectionHeader index="03">
-          <span id="progress-charts">Over time</span>
-        </SectionHeader>
-        {charts.has_history ? (
-          <Suspense fallback={<ChartsFallback />}>
-            <ProgressCharts data={charts} />
-          </Suspense>
-        ) : (
-          <Card label="Charts" meta="After the first sessions">
-            <p className="m-0 text-[13.5px] leading-snug text-paper-dim">No history yet, and that is fine. These fill in as you train:</p>
-            <ul className="m-0 mt-2 list-none p-0 text-[13px] leading-relaxed text-paper">
-              <li>· e1RM per main lift</li>
-              <li>· Weekly sets per muscle</li>
-              <li>· Cardio and walking vs WHO {ctx.config.who.weekly_minutes} min</li>
-              <li>· Check-in average per week</li>
-            </ul>
-          </Card>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3" aria-labelledby="progress-flags">
-        <SectionHeader index="04">
-          <span id="progress-flags">Flags</span>
-        </SectionHeader>
-        <FlagsCard flags={state.flags} />
-      </section>
+      {state.flags.length > 0 && (
+        <section className="flex flex-col gap-3" aria-labelledby="progress-flags">
+          <SectionHeader>
+            <span id="progress-flags">Heads up</span>
+          </SectionHeader>
+          <FlagsCard flags={state.flags} />
+        </section>
+      )}
 
       {!sunday && (
         <section className="flex flex-col gap-3" aria-labelledby="progress-review">
-          <SectionHeader index="05">
-            <span id="progress-review">Sunday review</span>
+          <SectionHeader>
+            <span id="progress-review">Weekly review</span>
           </SectionHeader>
           {review}
         </section>

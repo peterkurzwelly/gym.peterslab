@@ -20,6 +20,8 @@ export {
   updateCardio,
   deleteCardio,
   saveCheckin,
+  saveBodyLog,
+  addToBodyLog,
   repairWeek,
   persistDecisions,
   saveCustomExercise,
@@ -31,6 +33,8 @@ export {
   type FinishResult,
   type LogCardioInput,
   type CheckinInput,
+  type BodyLogPatch,
+  type BodyLogCounter,
   type CustomExerciseInput,
 } from "./repo";
 export { getDefaults, loadContext, buildContext, readSnapshot, type DataSnapshot } from "./context";
@@ -39,6 +43,8 @@ export {
   usePlan,
   useSessionSummary,
   useCardioPlan,
+  useBody,
+  useBodyLogs,
   useNow,
   useSettings,
   useSessionLogs,

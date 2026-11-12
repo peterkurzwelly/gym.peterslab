@@ -102,10 +102,10 @@ export async function loadContext(now: string = nowIso(), database: WorkoutDb = 
 }
 
 /**
- * Cheap content signature of a snapshot (FNV-1a over ids and updated_at), so several hook
- * instances can share one computeState result for identical data.
+ * Cheap content signature of groups of rows (FNV-1a over ids and updated_at). Every write bumps updated_at,
+ * so equal signatures mean equal data.
  */
-export function snapshotSignature(snapshot: DataSnapshot): string {
+export function rowsSignature(groups: { id: string; updated_at: string }[][]): string {
   let h = 0x811c9dc5;
   const mix = (s: string) => {
     for (let i = 0; i < s.length; i++) {
@@ -113,15 +113,6 @@ export function snapshotSignature(snapshot: DataSnapshot): string {
       h = Math.imul(h, 0x01000193);
     }
   };
-  const groups: { id: string; updated_at: string }[][] = [
-    snapshot.settings ? [snapshot.settings] : [],
-    snapshot.sessions,
-    snapshot.setLogs,
-    snapshot.cardioLogs,
-    snapshot.checkins,
-    snapshot.trainingWeeks,
-    snapshot.customExercises,
-  ];
   const counts: number[] = [];
   for (const rows of groups) {
     counts.push(rows.length);
@@ -132,4 +123,17 @@ export function snapshotSignature(snapshot: DataSnapshot): string {
     mix("|");
   }
   return `${counts.join(".")}:${(h >>> 0).toString(36)}`;
+}
+
+/** Signature of a snapshot, so several hook instances can share one computeState result for identical data. */
+export function snapshotSignature(snapshot: DataSnapshot): string {
+  return rowsSignature([
+    snapshot.settings ? [snapshot.settings] : [],
+    snapshot.sessions,
+    snapshot.setLogs,
+    snapshot.cardioLogs,
+    snapshot.checkins,
+    snapshot.trainingWeeks,
+    snapshot.customExercises,
+  ]);
 }

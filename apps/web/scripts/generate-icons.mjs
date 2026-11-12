@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * App icons for the home screen PWA, drawn to match public/favicon.svg: ink background, paper bar,
- * orange plates, plus a faint drafting grid, a sheet frame and a dimension line for the drawing-sheet feel.
+ * App icons for the home screen PWA, drawn to match public/favicon.svg: night background with a soft volt
+ * glow, white bar, volt plates.
  *
  *   node apps/web/scripts/generate-icons.mjs
  *
@@ -24,68 +24,38 @@ import ico from "sharp-ico";
 const here = dirname(fileURLToPath(import.meta.url));
 const pub = join(here, "..", "public");
 
-const INK = "#04261E";
-const PAPER = "#F2EDD5";
-const ORANGE = "#F26716";
-const LINE = "#1D4D3F";
-const GRID = "#0C3428";
-const FAINT = "#7F8D7F";
+const NIGHT = "#0a0a0c";
+const GLOW = "#1b2208";
+const FG = "#f5f5f7";
+const VOLT = "#c9f73a";
+const VOLT_DIM = "#86a626";
 
-/** Drafting grid over the whole canvas: minor every 32, major every 128. */
-function grid() {
-  const minor = [];
-  const major = [];
-  for (let v = 32; v < 512; v += 32) {
-    const target = v % 128 === 0 ? major : minor;
-    target.push(`M${v} 0V512M0 ${v}H512`);
-  }
-  return `<path d="${minor.join("")}" stroke="${GRID}" stroke-width="2"/><path d="${major.join("")}" stroke="${LINE}" stroke-width="2"/>`;
+/** A soft volt glow from the top left, the same light as the app's hero card. */
+function glow() {
+  return `<radialGradient id="glow" cx="0.2" cy="0.1" r="0.95"><stop offset="0" stop-color="${GLOW}"/><stop offset="1" stop-color="${NIGHT}"/></radialGradient>`;
 }
 
-/** The barbell, the favicon scaled ×8, with a dimension line under it. */
+/** The barbell: white bar, volt plates. The favicon scaled ×8. */
 function artwork() {
-  const bar = `<rect x="80" y="216" width="352" height="80" rx="16" fill="${PAPER}"/>`;
-  const plates = `<rect x="112" y="144" width="56" height="224" rx="16" fill="${ORANGE}"/><rect x="344" y="144" width="56" height="224" rx="16" fill="${ORANGE}"/>`;
-  // Dimension line between the plate centres: extension lines, architectural ticks, the line itself.
-  const y = 412;
-  const dim = [
-    `<path d="M140 384V${y + 18}M372 384V${y + 18}" stroke="${FAINT}" stroke-width="4" stroke-linecap="round"/>`,
-    `<path d="M140 ${y}H372" stroke="${FAINT}" stroke-width="4" stroke-linecap="round"/>`,
-    `<path d="M128 ${y + 12}L152 ${y - 12}M360 ${y + 12}L384 ${y - 12}" stroke="${PAPER}" stroke-width="5" stroke-linecap="round"/>`,
-  ].join("");
-  // Centre line behind the bar, dash dot like a drawing's axis.
-  const axis = `<path d="M256 92V444" stroke="${FAINT}" stroke-opacity="0.8" stroke-width="3" stroke-linecap="round" stroke-dasharray="22 10 3 10"/>`;
-  return `${axis}${bar}${plates}${dim}`;
-}
-
-/** Sheet frame with corner registration marks. */
-function frame(inset) {
-  const a = inset;
-  const b = 512 - inset;
-  const m = 20;
-  const marks = [
-    `M${a} ${a + m}V${a}H${a + m}`,
-    `M${b - m} ${a}H${b}V${a + m}`,
-    `M${a} ${b - m}V${b}H${a + m}`,
-    `M${b - m} ${b}H${b}V${b - m}`,
-  ].join("");
-  return `<rect x="${a}" y="${a}" width="${b - a}" height="${b - a}" fill="none" stroke="${LINE}" stroke-width="3"/><path d="${marks}" fill="none" stroke="${PAPER}" stroke-opacity="0.55" stroke-width="5" stroke-linecap="square"/>`;
+  const bar = `<rect x="72" y="224" width="368" height="64" rx="20" fill="${FG}"/>`;
+  const inner = `<rect x="124" y="136" width="60" height="240" rx="20" fill="${VOLT}"/><rect x="328" y="136" width="60" height="240" rx="20" fill="${VOLT}"/>`;
+  const outer = `<rect x="88" y="176" width="28" height="160" rx="12" fill="${VOLT_DIM}"/><rect x="396" y="176" width="28" height="160" rx="12" fill="${VOLT_DIM}"/>`;
+  return `${bar}${outer}${inner}`;
 }
 
 /**
  * kind "square": full bleed (apple touch, maskable). kind "rounded": rounded tile with transparent corners.
  * scale shrinks the artwork around the centre (maskable safe zone).
  */
-function iconSvg({ kind, scale = 1, inset = 36 }) {
+function iconSvg({ kind, scale = 1 }) {
   const t = scale === 1 ? "" : ` transform="translate(256 256) scale(${scale}) translate(-256 -256)"`;
   const clip = kind === "rounded" ? `<clipPath id="tile"><rect width="512" height="512" rx="112"/></clipPath>` : "";
   const open = kind === "rounded" ? `<g clip-path="url(#tile)">` : "<g>";
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-<defs>${clip}</defs>
+<defs>${clip}${glow()}</defs>
 ${open}
-<rect width="512" height="512" fill="${INK}"/>
-${grid()}
-${kind === "square" ? frame(inset) : ""}
+<rect width="512" height="512" fill="${NIGHT}"/>
+<rect width="512" height="512" fill="url(#glow)"/>
 <g${t}>${artwork()}</g>
 </g>
 </svg>`;
@@ -105,11 +75,11 @@ const favicon = await readFile(join(pub, "favicon.svg"));
 console.log("Writing icons to apps/web/public:");
 await png(iconSvg({ kind: "rounded" }), 192, "pwa-192x192.png");
 await png(iconSvg({ kind: "rounded" }), 512, "pwa-512x512.png");
-// Maskable: launchers crop to a circle or squircle inside 80%. Artwork stays inside that, frame dropped.
-await png(iconSvg({ kind: "square", scale: 0.78, inset: -10 }), 512, "maskable-icon-512x512.png");
+// Maskable: launchers crop to a circle or squircle inside 80%. Artwork stays inside that.
+await png(iconSvg({ kind: "square", scale: 0.78 }), 512, "maskable-icon-512x512.png");
 // iOS: opaque, full bleed. iOS applies its own corner mask.
 await png(iconSvg({ kind: "square", scale: 0.9 }), 180, "apple-touch-icon-180x180.png");
-// Small sizes: the plain favicon reads better than the drawing details.
+// Small sizes: the plain favicon reads better than the glow.
 await sharp(favicon, { density: 72 * 4 }).resize(64, 64).png({ compressionLevel: 9 }).toFile(join(pub, "pwa-64x64.png"));
 console.log("  pwa-64x64.png");
 const ico48 = await sharp(favicon, { density: 72 * 4 }).resize(48, 48).png().toBuffer();

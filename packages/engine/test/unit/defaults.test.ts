@@ -57,4 +57,26 @@ describe("defaultSettings", () => {
     const { evening_hour: _e, week_killers: _w, ...rest } = s;
     expect(Settings.parse(rest)).toMatchObject({ evening_hour: s.evening_hour, week_killers: s.week_killers });
   });
+
+  test("body and fuel: no profile yet, cut at the config rate, equal to the schema defaults", () => {
+    const s = defaultSettings(config, program, "2026-11-08T10:00:00.000Z");
+    const body = {
+      sex: null,
+      birth_year: null,
+      height_cm: null,
+      job_activity: "desk",
+      goal: "cut",
+      cut_rate_pct: config.body.cut_rate.default_pct,
+      goal_weight_kg: null,
+      kcal_override: null,
+      protein_override_g: null,
+      steps_target: config.body.steps_target_default,
+      body_adjust_since: null,
+      body_adjust_base_kcal: 0,
+    };
+    expect(s).toMatchObject(body);
+    // A row stored before these fields existed parses to the same values.
+    const legacy = Object.fromEntries(Object.entries(s).filter(([k]) => !(k in body)));
+    expect(Settings.parse(legacy)).toEqual(s);
+  });
 });

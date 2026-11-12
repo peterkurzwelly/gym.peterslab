@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { normalize } from "../../src/context";
-import { History, at, ctxOf, day } from "./fixtures";
+import type { Settings } from "@gym/schema";
+import { normalize, withSettingsDefaults } from "../../src/context";
+import { History, at, ctxOf, day, settings } from "./fixtures";
 
 describe("normalize", () => {
   test("deleted sessions, set logs, cardio logs and check-ins are ignored", () => {
@@ -81,5 +82,20 @@ describe("normalize", () => {
     expect(normalize(ctx, { excludeSessionId: a.id }).sessions).toHaveLength(1);
     expect(normalize(ctx, { at: at(day(1)) }).sessions).toHaveLength(1);
     expect(normalize(ctx).tz).toBe("Europe/Stockholm");
+  });
+});
+
+describe("withSettingsDefaults", () => {
+  test("a complete row is returned as is", () => {
+    const s = settings({ sex: "male", evening_hour: null });
+    expect(withSettingsDefaults(s)).toBe(s);
+  });
+
+  test("fields added after the first release take the schema defaults; stored values and nulls stay", () => {
+    const full = settings();
+    const { evening_hour: _e, week_killers: _w, sex: _s, goal: _g, cut_rate_pct: _c, steps_target: _st, kcal_override: _k, ...old } = full;
+    const filled = withSettingsDefaults({ ...old, job_activity: "physical", birth_year: null } as Settings);
+    expect(filled).toEqual({ ...full, job_activity: "physical" });
+    expect(old).not.toHaveProperty("goal"); // the input is not changed
   });
 });

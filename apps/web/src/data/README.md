@@ -6,10 +6,10 @@ Import everything from `../data` (the barrel `index.ts`).
 
 | File | What |
 |---|---|
-| `db.ts` | Dexie database `workout-os`: one table per synced row type + `outbox` + `meta` |
+| `db.ts` | Dexie database `workout-os` (version 2): one table per synced row type + `outbox` + `meta` |
 | `repo.ts` | The only write path. One transaction per mutation, `updated_at` strictly increasing per row, outbox queued |
 | `context.ts` | Builds `EngineContext` from Dexie (`loadContext`, `buildContext`) |
-| `hooks.ts` | `useEngine`, `usePlan`, `useSessionSummary`, `useCardioPlan`, plus live reads |
+| `hooks.ts` | `useEngine`, `usePlan`, `useSessionSummary`, `useCardioPlan`, `useBody`, plus live reads |
 | `sync.ts` | `syncClient` singleton, `useSyncStatus` |
 | `backup.ts` | Export / import, local file and server |
 | `storage.ts` | `navigator.storage.persist()` and usage estimate |
@@ -83,6 +83,34 @@ const checkin = useCheckin(state.today); // live, null when none
 
 One row per local date (`ck_YYYY-MM-DD`), saving again overwrites it. `state.readiness` reflects it on the next render.
 
+## Body and fuel
+
+```tsx
+const body = useBody();                            // BodyState | null (null while loading)
+if (!body) return null;
+body.targets;                                      // kcal, protein_g, fat_min_g, steps + reason (show it under the numbers)
+body.missing;                                      // ["sex", "birth_year", "height_cm", "weight"] still needed for kcal
+body.pace; body.pace_text;                         // setup | collecting | on_pace | slow | fast | off_goal
+body.series;                                       // one { date, weight, avg } per day for the chart
+body.log_today; body.protein_today; body.protein_hit; body.steps_hit;
+
+await saveBodyLog(body.today, { weight_kg: 84.6 });           // upsert for that local date, merges
+await saveBodyLog(body.today, { waist_cm: 91, note: null });  // null clears a field, left out fields stay
+await addToBodyLog(body.today, "protein_g", 30);              // adds to the day's total (protein_g | kcal | steps)
+await addToBodyLog(body.today, "protein_g", -30);             // undo: never below 0, never above the schema max
+const logs = useBodyLogs();                                   // BodyLog[], oldest first, [] while loading
+
+await updateSettings({ sex: "male", birth_year: 1986, height_cm: 180, job_activity: "desk" });
+await updateSettings({ goal: "cut", cut_rate_pct: 0.5, goal_weight_kg: 80, steps_target: 8000 });
+await updateSettings({ kcal_override: 2100 });                // own number wins; null gives the engine's back
+```
+
+- One row per local date (`bd_YYYY-MM-DD`). Pass `body.today` (the engine's local date), not a date from `new Date()`.
+- `saveBodyLog` validates against the schema and throws on a value outside its range (`BODY_LIMITS` in `@gym/schema` has the ranges for input fields); nothing is written then. `addToBodyLog` clamps instead, so a quick add button cannot fail.
+- `useBody` recomputes when a body log or the settings change (local or synced) and when the local day rolls over (the shared 30 s / app visible clock). Within a day the same object is returned while nothing changes, and every component shares it.
+- Every number comes from the engine (`computeBody`, ENGINE_RULES section 10). The UI renders `targets` and shows `targets.reason`; the decisions behind them are in `body.decisions` and are not stored.
+- `cut_rate_pct` is percent of body weight per week: 0.5 means 0.5%. Allowed 0.25 to 1.
+
 ## Cardio and walks
 
 ```ts
@@ -136,7 +164,14 @@ await pushRemoteImport(file, "merge");          // POST /api/import?mode=merge|r
 const { usage, quota, persisted } = await storageEstimate();
 ```
 
-Everything imported is queued for sync.
+Everything imported is queued for sync. Export, import and sync walk `SYNC_TABLES`, so `body_log` travels with the rest. A file written before a table or a settings field existed still imports: missing tables are skipped and missing settings fields take their defaults. `replace` is the clear everything path: local rows missing from the file are soft deleted, body logs included.
+
+## Database versions
+
+- **1**: the first release.
+- **2**: adds the `body_log` store (`id, date`). Existing stores and rows carry over untouched; the settings row on the device gets the defaults of fields added since it was written (no new `updated_at`, the server fills the same defaults).
+
+Adding a synced table: add it to `SYNC_TABLES` / `TableSchemas` in `@gym/schema`, add the store in a new `this.version(n)` in `db.ts` (never edit an old version), and add the D1 migration. Sync, export, import and reset pick it up from `SYNC_TABLES`.
 
 ## Rules for UI code
 

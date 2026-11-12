@@ -1,13 +1,8 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppShell, ShellDock, ShellTitle } from "../../src/components/AppShell";
-import { FinishBar } from "../../src/components/FinishBar";
 import { IntervalTimer, intervalProgress } from "../../src/components/IntervalTimer";
-import { WeekCard } from "../../src/components/WeekCard";
-import { NextSessionCard } from "../../src/components/NextSessionCard";
-import { blockWeek3Floor, cardioDemo, cardioIntervals, goals, nextB, nextDoneToday, weekFloor, weekFresh, blockWeek1 } from "../../src/components/__fixtures__";
-import { segmentAt } from "../../src/lib/timers";
+import { cardioDemo, cardioIntervals } from "../../src/components/__fixtures__";
+import { secondsLeft, segmentAt, toMs } from "../../src/lib/timers";
 
 const T0 = new Date("2026-11-11T17:30:00.000Z").getTime();
 
@@ -72,99 +67,12 @@ describe("IntervalTimer", () => {
   });
 });
 
-describe("FinishBar", () => {
-  it("shows elapsed time and sets", () => {
-    const onFinish = vi.fn();
-    render(<FinishBar startedAt={T0 - 125_000} setsDone={5} setsTotal={8} onFinish={onFinish} />);
-    expect(screen.getByText("2:05")).toBeTruthy();
-    expect(screen.getByText("5 of 8 sets")).toBeTruthy();
-    advance(5_000);
-    expect(screen.getByText("2:10")).toBeTruthy();
-    // 5 of 8: the first tap asks inline, the second one finishes.
-    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
-    expect(onFinish).not.toHaveBeenCalled();
-    const ask = screen.getByRole("group", { name: "Finish early" });
-    expect(within(ask).getByText(/Finish with 5 of 8 sets\?/)).toBeTruthy();
-    fireEvent.click(within(ask).getByRole("button", { name: "Finish" }));
-    expect(onFinish).toHaveBeenCalledTimes(1);
-  });
-
-  it("finishes in one tap when every set is logged", () => {
-    const onFinish = vi.fn();
-    render(<FinishBar startedAt={T0} setsDone={8} setsTotal={8} onFinish={onFinish} />);
-    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
-    expect(onFinish).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("group", { name: "Finish early" })).toBeNull();
-  });
-
-  it("a stray tap with sets open is undone by Keep going, which sits where Finish was", () => {
-    const onFinish = vi.fn();
-    const { rerender } = render(<FinishBar startedAt={T0} setsDone={1} setsTotal={12} onFinish={onFinish} />);
-    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
-    const ask = screen.getByRole("group", { name: "Finish early" });
-    expect(within(ask).getByText(/Finish with 1 of 12 sets\?/)).toBeTruthy();
-    const buttons = within(ask).getAllByRole("button").map((b) => b.textContent);
-    expect(buttons).toEqual(["Finish", "Keep going"]);
-    fireEvent.click(within(ask).getByRole("button", { name: "Keep going" }));
-    expect(onFinish).not.toHaveBeenCalled();
-    expect(screen.getByText("1 of 12 sets")).toBeTruthy();
-
-    // Logging another set closes an open question.
-    fireEvent.click(screen.getByRole("button", { name: "Finish" }));
-    rerender(<FinishBar startedAt={T0} setsDone={2} setsTotal={12} onFinish={onFinish} />);
-    expect(screen.queryByRole("group", { name: "Finish early" })).toBeNull();
-    expect(screen.getByText("2 of 12 sets")).toBeTruthy();
-  });
-});
-
-describe("AppShell", () => {
-  it("renders tabs, gear, and portals screen content into the title and dock slots", () => {
-    render(
-      <MemoryRouter initialEntries={["/plan"]}>
-        <AppShell>
-          <ShellTitle>Session A</ShellTitle>
-          <ShellDock>
-            <div>dock content</div>
-          </ShellDock>
-          <p>body</p>
-        </AppShell>
-      </MemoryRouter>,
-    );
-    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
-    expect(screen.getByRole("link", { name: /Plan/ }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: /Today/ }).getAttribute("aria-current")).toBeNull();
-    expect(screen.getByText("Session A")).toBeTruthy();
-    expect(screen.getByText("dock content")).toBeTruthy();
-    expect(screen.getByText("body")).toBeTruthy();
-  });
-});
-
-describe("cards", () => {
-  it("week card states read calmly", () => {
-    const { rerender } = render(<WeekCard week={weekFresh} block={blockWeek1} goals={goals} />);
-    expect(screen.getByText("Week 1 of 12")).toBeTruthy();
-    expect(screen.getByText("0 of 4 done")).toBeTruthy();
-    expect(screen.getByText("2 strength sessions reach the floor")).toBeTruthy();
-    expect(screen.queryByText(/reached/)).toBeNull();
-    rerender(<WeekCard week={weekFloor} block={blockWeek3Floor} goals={goals} />);
-    expect(screen.getByText("2 of 4 done")).toBeTruthy();
-    expect(screen.getByText("Floor reached ✓")).toBeTruthy();
-  });
-
-  it("next session card: start buttons and done for today", () => {
-    const onStart = vi.fn();
-    const { rerender } = render(<NextSessionCard next={nextB} cardio={cardioIntervals} cardioDone={false} onStart={onStart} />);
-    expect(screen.getByText("Session B")).toBeTruthy();
-    expect(screen.getByText("~55 min")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Start B" }));
-    fireEvent.click(screen.getByRole("button", { name: /30 min version of session B/ }));
-    expect(onStart.mock.calls).toEqual([["full"], ["short"]]);
-    expect(screen.getByText("4 × 2 min hard / 2 min easy")).toBeTruthy();
-
-    rerender(<NextSessionCard next={nextDoneToday} cardio={cardioIntervals} cardioDone onStart={onStart} />);
-    expect(screen.getByText("Done for today")).toBeTruthy();
-    expect(screen.getByText("Next: Session C, whenever it fits.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Start/ })).toBeNull();
-    expect(screen.getByText("Cardio done this week")).toBeTruthy();
+describe("timestamp helpers", () => {
+  it("seconds left round up and never go below zero", () => {
+    expect(secondsLeft(T0 + 1_001, T0)).toBe(2);
+    expect(secondsLeft(T0 + 1_000, T0)).toBe(1);
+    expect(secondsLeft(T0, T0 + 5_000)).toBe(0);
+    expect(toMs("2026-11-11T17:30:00.000Z")).toBe(T0);
+    expect(toMs(T0)).toBe(T0);
   });
 });

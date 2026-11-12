@@ -20,9 +20,9 @@ describe("POST /api/sync", () => {
     const changes = allFixtures();
     const res = await sync({ changes });
     expect(SyncResponse.safeParse(res).success).toBe(true);
-    expect(res.accepted).toBe(8);
+    expect(res.accepted).toBe(SYNC_TABLES.length);
     expect(res.rejected).toEqual([]);
-    expect(res.cursor).toBe(8);
+    expect(res.cursor).toBe(SYNC_TABLES.length);
     expect(res.more).toBe(false);
     for (const t of SYNC_TABLES) expect(res.changes[t], t).toEqual(changes[t]);
 
@@ -271,6 +271,155 @@ describe("POST /api/sync", () => {
     expect(res.changes.settings?.[0]).toMatchObject({ evening_hour: 19, week_killers: ["work_peaks", "travel", "evenings"] });
   });
 
+  it("settings round trip the body fields; a row from before they existed gets the defaults", async () => {
+    const mine = fixtures.settings();
+    await sync({ changes: { settings: [mine] } });
+    expect((await sync({ client_id: "ipad" })).changes.settings).toEqual([mine]);
+
+    // Cleared profile and overrides come back as null, not as a default.
+    const cleared = fixtures.settings({
+      updated_at: T1,
+      sex: null,
+      birth_year: null,
+      height_cm: null,
+      goal_weight_kg: null,
+      kcal_override: null,
+      protein_override_g: null,
+    });
+    await sync({ changes: { settings: [cleared] } });
+    expect((await sync({ client_id: "ipad" })).changes.settings).toEqual([cleared]);
+
+    await resetDb();
+    const {
+      sex: _s, birth_year: _b, height_cm: _h, job_activity: _j, goal: _g, cut_rate_pct: _c,
+      goal_weight_kg: _gw, kcal_override: _k, protein_override_g: _p, steps_target: _st,
+      body_adjust_since: _as, body_adjust_base_kcal: _ab,
+      ...legacy
+    } = fixtures.settings();
+    const res = await sync({ changes: { settings: [legacy] } });
+    expect(res.accepted).toBe(1);
+    expect(res.changes.settings?.[0]).toEqual({
+      ...legacy,
+      sex: null,
+      birth_year: null,
+      height_cm: null,
+      job_activity: "desk",
+      goal: "cut",
+      cut_rate_pct: 0.5,
+      goal_weight_kg: null,
+      kcal_override: null,
+      protein_override_g: null,
+      steps_target: 8000,
+      body_adjust_since: null,
+      body_adjust_base_kcal: 0,
+    });
+  });
+
+  it("settings body fields are validated", async () => {
+    const bad = [
+      { ...fixtures.settings(), cut_rate_pct: 1.5 },
+      { ...fixtures.settings(), cut_rate_pct: 0.1 },
+      { ...fixtures.settings(), sex: "other" },
+      { ...fixtures.settings(), goal: "bulk" },
+      { ...fixtures.settings(), job_activity: "couch" },
+      { ...fixtures.settings(), steps_target: 8000.5 },
+      { ...fixtures.settings(), birth_year: 1986.5 },
+      { ...fixtures.settings(), goal_weight_kg: 20 },
+      { ...fixtures.settings(), body_adjust_since: "5 Nov" },
+      { ...fixtures.settings(), body_adjust_base_kcal: -100.5 },
+      { ...fixtures.settings(), body_adjust_base_kcal: null },
+    ];
+    for (const row of bad) {
+      const res = await sync({ changes: { settings: [row] } });
+      expect(res.accepted, JSON.stringify(row)).toBe(0);
+      expect(res.rejected).toHaveLength(1);
+    }
+    // The ends of the cut rate range are fine.
+    expect((await sync({ changes: { settings: [fixtures.settings({ cut_rate_pct: 0.25 })] } })).accepted).toBe(1);
+    expect((await sync({ changes: { settings: [fixtures.settings({ cut_rate_pct: 1, updated_at: T1 })] } })).accepted).toBe(1);
+  });
+
+  describe("body_log", () => {
+    it("round trips decimals, whole steps, text and nulls", async () => {
+      const full = fixtures.body_log();
+      const sparse = fixtures.body_log({
+        id: "bd_2026-11-03",
+        date: "2026-11-03",
+        weight_kg: null,
+        waist_cm: null,
+        steps: 0,
+        protein_g: 0,
+        kcal: null,
+        sleep_h: null,
+        note: null,
+      });
+      const res = await sync({ changes: { body_log: [full, sparse] } });
+      expect(res.accepted).toBe(2);
+      expect(res.rejected).toEqual([]);
+      expect(res.changes.body_log).toEqual([full, sparse]);
+      expect((await sync({ client_id: "ipad" })).changes.body_log).toEqual([full, sparse]);
+
+      const stored = await env.DB.prepare(`SELECT weight_kg, steps, note, typeof(steps) AS steps_type FROM body_log WHERE id = ?1`)
+        .bind(full.id)
+        .first<{ weight_kg: number; steps: number; note: string; steps_type: string }>();
+      expect(stored).toEqual({ weight_kg: 84.35, steps: 9120, note: "Slept well.", steps_type: "integer" });
+    });
+
+    it("one row per date: last write wins, a soft delete propagates", async () => {
+      const first = await sync({ changes: { body_log: [fixtures.body_log()] } });
+      const later = fixtures.body_log({ updated_at: T1, weight_kg: 84.1, protein_g: 180 });
+      expect((await sync({ changes: { body_log: [later] } })).accepted).toBe(1);
+      // An older write from another device loses.
+      expect((await sync({ changes: { body_log: [fixtures.body_log({ updated_at: T0, weight_kg: 90 })] } })).accepted).toBe(0);
+      expect((await sync({ client_id: "ipad", cursor: first.cursor })).changes.body_log).toEqual([later]);
+
+      const gone = fixtures.body_log({ updated_at: T2, deleted_at: T2 });
+      expect((await sync({ changes: { body_log: [gone] } })).accepted).toBe(1);
+      expect((await sync({ client_id: "ipad", cursor: first.cursor })).changes.body_log).toEqual([gone]);
+    });
+
+    it("values outside the allowed ranges are refused, the rest of the push lands", async () => {
+      const good = fixtures.body_log();
+      const bad = (id: string, o: Record<string, unknown>) => ({ ...fixtures.body_log({ id, date: "2026-11-04" }), ...o });
+      const res = await sync({
+        changes: {
+          body_log: [
+            good,
+            bad("w_low", { weight_kg: 29.9 }),
+            bad("w_high", { weight_kg: 300.1 }),
+            bad("waist", { waist_cm: 39 }),
+            bad("steps_frac", { steps: 100.5 }),
+            bad("steps_neg", { steps: -1 }),
+            bad("steps_high", { steps: 100001 }),
+            bad("protein", { protein_g: 501 }),
+            bad("kcal", { kcal: 10001 }),
+            bad("sleep", { sleep_h: 24.5 }),
+            bad("note", { note: "x".repeat(501) }),
+            bad("date", { date: "4 Nov" }),
+            { id: "no_fields" },
+          ],
+        },
+      });
+      expect(res.accepted).toBe(1);
+      expect(res.changes.body_log).toEqual([good]);
+      expect(res.rejected.map((r) => r.id).sort()).toEqual(
+        ["date", "kcal", "no_fields", "note", "protein", "sleep", "steps_frac", "steps_high", "steps_neg", "w_high", "w_low", "waist"].sort(),
+      );
+      expect(res.rejected.every((r) => r.table === "body_log")).toBe(true);
+      expect(res.rejected.find((r) => r.id === "w_low")!.reason).toContain("weight_kg");
+    });
+
+    it("the range ends are allowed", async () => {
+      const low = fixtures.body_log({ id: "bd_2026-11-05", date: "2026-11-05", weight_kg: 30, waist_cm: 40, steps: 0, protein_g: 0, kcal: 0, sleep_h: 0, note: "" });
+      const high = fixtures.body_log({
+        id: "bd_2026-11-06", date: "2026-11-06", weight_kg: 300, waist_cm: 200, steps: 100000, protein_g: 500, kcal: 10000, sleep_h: 24, note: "x".repeat(500),
+      });
+      const res = await sync({ changes: { body_log: [low, high] } });
+      expect(res.accepted).toBe(2);
+      expect(res.changes.body_log).toEqual([low, high]);
+    });
+  });
+
   it("rejects a malformed envelope with 400", async () => {
     for (const body of [
       { cursor: 0, changes: {} },
@@ -296,6 +445,6 @@ describe("POST /api/sync", () => {
     expect(new Set(revs).size).toBe(revs.length);
     expect(Math.max(...revs)).toBe(await globalRev());
     const session = await env.DB.prepare(`SELECT rev FROM session`).first<{ rev: number }>();
-    expect(session!.rev).toBe(9);
+    expect(session!.rev).toBe(SYNC_TABLES.length + 1);
   });
 });

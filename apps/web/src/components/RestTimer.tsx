@@ -57,25 +57,21 @@ export function RestTimer({ startedAt, endsAt, label, onAdd, onSkip, onDone, sou
   }, [now, end, sound, alert]);
 
   return (
-    <div
-      className={cx("relative overflow-hidden rounded-[4px] border border-line bg-ink-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)]", className)}
-      role="timer"
-      aria-label={`Rest, ${fmtClock(left)} left`}
-    >
-      <div aria-hidden className="absolute inset-x-0 top-0 h-[2px] bg-line">
-        <div className="h-full origin-left bg-paper" style={{ transform: `scaleX(${fraction})` }} />
+    <div className={cx("relative overflow-hidden rounded-[24px] bg-card shadow-[0_12px_32px_rgba(0,0,0,0.6)]", className)} role="timer" aria-label={`Rest, ${fmtClock(left)} left`}>
+      <div aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-raise-2">
+        <div className="h-full origin-left bg-volt" style={{ transform: `scaleX(${fraction})` }} />
       </div>
-      <div className="flex items-center gap-2 py-2 pl-4 pr-2">
+      <div className="flex items-center gap-2 py-2.5 pl-4 pr-2.5">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[10.5px] uppercase tracking-[0.14em] text-paper-faint">Rest{label ? ` · ${label}` : ""}</div>
-          <div className="font-mono text-[34px] font-semibold leading-[1.1] tabular-nums tracking-[-0.02em] text-paper" aria-hidden>
+          <div className="gym-label truncate">Rest{label ? ` · then ${label}` : ""}</div>
+          <div className="mt-0.5 font-display text-[40px] leading-none tabular-nums text-fg" aria-hidden>
             {fmtClock(left)}
           </div>
         </div>
-        <button type="button" onClick={() => onAdd(30)} className="gym-press h-12 shrink-0 rounded-[3px] border border-line px-3 font-mono text-[13px] tabular-nums text-paper active:bg-ink-3">
+        <button type="button" onClick={() => onAdd(30)} className="gym-press h-12 shrink-0 rounded-full bg-raise px-4 text-[14px] font-semibold tabular-nums text-fg active:bg-raise-2">
           +30 s
         </button>
-        <button type="button" onClick={onSkip} className="gym-press h-12 shrink-0 rounded-[3px] px-3 font-mono text-[12px] uppercase tracking-[0.1em] text-paper-dim active:bg-ink-3">
+        <button type="button" onClick={onSkip} className="gym-press h-12 shrink-0 rounded-full px-3 text-[14px] font-semibold text-fg-dim active:bg-raise">
           Skip
         </button>
       </div>

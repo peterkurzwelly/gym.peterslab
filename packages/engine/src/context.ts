@@ -156,17 +156,36 @@ function kindOf(code: DayCode): SessionKind {
 
 const notDeleted = <T extends { deleted_at: string | null }>(r: T) => r.deleted_at == null;
 
+/** Settings fields added after the first release. Rows stored before they existed lack them. */
+const DEFAULTED_SETTINGS = [
+  "evening_hour",
+  "week_killers",
+  "sex",
+  "birth_year",
+  "height_cm",
+  "job_activity",
+  "goal",
+  "cut_rate_pct",
+  "goal_weight_kg",
+  "kcal_override",
+  "protein_override_g",
+  "steps_target",
+  "body_adjust_since",
+  "body_adjust_base_kcal",
+] as const satisfies readonly (keyof Settings)[];
+
 /**
- * Settings rows written before evening_hour / week_killers existed lack them: fill the schema defaults
- * (evening_hour null stays null, it means off).
+ * Settings rows written before a defaulted field existed lack it: fill the schema default
+ * (a stored null stays null, e.g. evening_hour null means off).
  */
 export function withSettingsDefaults(s: Settings): Settings {
-  if (s.evening_hour !== undefined && s.week_killers !== undefined) return s;
-  return {
-    ...s,
-    evening_hour: s.evening_hour === undefined ? SettingsSchema.shape.evening_hour.parse(undefined) : s.evening_hour,
-    week_killers: s.week_killers ?? SettingsSchema.shape.week_killers.parse(undefined),
-  };
+  let out: Record<string, unknown> | null = null;
+  for (const key of DEFAULTED_SETTINGS) {
+    if (s[key] !== undefined) continue;
+    out ??= { ...s };
+    out[key] = SettingsSchema.shape[key].parse(undefined);
+  }
+  return (out as Settings | null) ?? s;
 }
 
 export function normalize(ctx: EngineContext, opts: AnalyzeOptions = {}): Norm {

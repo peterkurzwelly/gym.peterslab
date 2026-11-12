@@ -78,7 +78,7 @@ only echoes its query into a calendar file and reads no stored data: never add s
 - Pull returns rows with `rev > cursor` from all tables in rev order, at most `limit` (default 1000, max 2000).
   `more: true` means call again with the returned `cursor`. `cursor` is the highest rev returned, or the request
   cursor when nothing came back. Soft-deleted rows sync like any row.
-- `changes` in the response always lists all eight tables (empty arrays when nothing changed). Rows the client
+- `changes` in the response always lists every table in `SYNC_TABLES` (empty arrays when nothing changed). Rows the client
   just pushed come back too (they have new revs); applying them is a no-op under LWW.
 - Reset: the response always carries `reset` and the database `epoch` (a random number in `sync_meta`, migration
   `0003`). A cursor ahead of the server's rev, or an `epoch` in the request that differs from the database's, means
@@ -124,6 +124,11 @@ npx wrangler d1 execute DB --remote --command "UPDATE sync_meta SET value = abs(
 
 Adding a field to a synced schema: add a new migration (`0002_….sql`) with `ALTER TABLE … ADD COLUMN`, with a
 `DEFAULT` when the field is `NOT NULL`. `test/schema.test.ts` fails until the migration matches.
+
+Adding a sync table (`0004_body.sql` added `body_log` and the body settings): add it to `SYNC_TABLES` and
+`TableSchemas` in `@gym/schema` and write the `CREATE TABLE` with its `rev` index. Sync, export and import pick it
+up from `SYNC_TABLES`. Apply the migration (`npm run db:migrate:remote`) **before** deploying the Worker that knows
+the table: pull and export read every table in `SYNC_TABLES`, so a Worker ahead of its database answers 500.
 
 ## Local development
 

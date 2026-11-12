@@ -4,9 +4,13 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
+  computeBody,
   computeState,
+  defaultSettings,
+  localDate,
   planSession,
   summarizeSession,
+  type BodyState,
   type CardioPlan,
   type EngineContext,
   type EngineState,
@@ -14,10 +18,10 @@ import {
   type SessionPlan,
   type SessionSummary,
 } from "@gym/engine";
-import type { CardioLog, Checkin, Session, SetLog, Settings } from "@gym/schema";
+import type { BodyLog, CardioLog, Checkin, Session, SetLog, Settings } from "@gym/schema";
 import { db } from "./db";
 import { nowIso } from "./clock";
-import { buildContext, readSnapshot, snapshotSignature, type DataSnapshot } from "./context";
+import { buildContext, getDefaults, readSnapshot, rowsSignature, snapshotSignature, type DataSnapshot } from "./context";
 import { ensureSettings, persistAutoFinished, persistDecisions } from "./repo";
 
 const NOW_REFRESH_MS = 30_000;
@@ -217,6 +221,88 @@ export function useCardioPlan(): CardioPlanResult {
   return { ready, plan: state?.cardio ?? null, error };
 }
 
+// ---------- body and fuel ----------
+
+interface BodySnapshot {
+  settings: Settings | null;
+  /** Live rows, oldest date first. */
+  logs: BodyLog[];
+}
+
+async function readBodyLogs(): Promise<BodyLog[]> {
+  return (await db.body_log.orderBy("date").toArray()).filter((l) => !l.deleted_at);
+}
+
+async function queryBody(): Promise<BodySnapshot | null> {
+  try {
+    const snapshot = await db.transaction("r", [db.settings, db.body_log], async () => {
+      const [settings, logs] = await Promise.all([db.settings.get("settings"), readBodyLogs()]);
+      return { settings: settings && !settings.deleted_at ? settings : null, logs };
+    });
+    // A log saved just after midnight must not be read against yesterday's "now".
+    advanceNowTo(nowIso());
+    return snapshot;
+  } catch (e) {
+    console.warn("[data] could not read body logs", e);
+    return null;
+  }
+}
+
+/** The engine's local date for an instant (settings timezone, config default when it is not valid). */
+function engineToday(now: string, timeZone: string, fallback: string): string {
+  try {
+    return localDate(now, timeZone);
+  } catch {
+    return localDate(now, fallback);
+  }
+}
+
+// computeBody depends on the data and the local date only, so one result is shared for the whole day:
+// across hook instances and across the 30 s ticks of "now".
+let lastBody: { key: string; value: BodyState | null } | null = null;
+
+function computeBodyCached(snapshot: BodySnapshot, now: string): BodyState | null {
+  const { config, program } = getDefaults();
+  const settings = snapshot.settings ?? defaultSettings(config, program, now);
+  const today = engineToday(now, settings.timezone, config.timezone_default);
+  const key = `${rowsSignature([snapshot.settings ? [snapshot.settings] : [], snapshot.logs])}|${today}`;
+  if (lastBody?.key === key) return lastBody.value;
+  let value: BodyState | null;
+  try {
+    value = computeBody({ config, settings, bodyLogs: snapshot.logs, now });
+  } catch (e) {
+    console.warn("[engine] body", e);
+    value = null;
+  }
+  lastBody = { key, value };
+  return value;
+}
+
+/**
+ * Body and fuel state from the engine: targets, weight trend, pace, today's log. null while loading (and if
+ * the engine could not compute; nothing throws into render). Recomputes when a body log or the settings change,
+ * locally or through sync, and when the local day rolls over (the shared 30 s / app visible clock).
+ */
+export function useBody(): BodyState | null {
+  const live = useLiveQuery(queryBody, []);
+  const now = useNow();
+  const state = useMemo(() => (live ? computeBodyCached(live, now) : null), [live, now]);
+
+  const missingSettings = !!live && !live.settings;
+  useEffect(() => {
+    if (missingSettings) ensureSettingsOnce();
+  }, [missingSettings]);
+
+  return state;
+}
+
+const NO_BODY_LOGS: BodyLog[] = [];
+
+/** Every body log (one per local date), oldest first, live. Empty while loading. */
+export function useBodyLogs(): BodyLog[] {
+  return useLiveQuery(readBodyLogs, [], NO_BODY_LOGS);
+}
+
 // ---------- plain live reads ----------
 
 /** The settings row (undefined while loading, null if not created yet). */
@@ -228,6 +314,8 @@ export function useSettings(): Settings | null | undefined {
 }
 
 export interface SessionLogs {
+  /** The id these logs were read for. Until it matches the id asked for, the logs are still loading. */
+  session_id: string | null;
   session: Session | null;
   /** Logged sets in log order. */
   sets: SetLog[];
@@ -237,13 +325,14 @@ export interface SessionLogs {
 /** Session row + its logged sets and cardio logs, live. undefined while loading. */
 export function useSessionLogs(sessionId: string | null | undefined): SessionLogs | undefined {
   return useLiveQuery(async () => {
-    if (!sessionId) return { session: null, sets: [], cardio: [] };
+    if (!sessionId) return { session_id: null, session: null, sets: [], cardio: [] };
     const [session, sets, cardio] = await Promise.all([
       db.session.get(sessionId),
       db.set_log.where("session_id").equals(sessionId).toArray(),
       db.cardio_log.where("session_id").equals(sessionId).toArray(),
     ]);
     return {
+      session_id: sessionId,
       session: session && !session.deleted_at ? session : null,
       sets: sets
         .filter((s) => !s.deleted_at)

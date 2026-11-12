@@ -80,23 +80,23 @@ export function Meter({ value, max, target, band, reached, className, label }: M
   const pct = (n: number) => `${Math.min(100, Math.max(0, (n / end) * 100))}%`;
   return (
     <div className={cx("relative h-[14px]", className)} role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={end} aria-valuenow={value}>
-      <div className="absolute inset-x-0 top-[3px] h-[8px] rounded-full bg-ink-3" />
+      <div className="absolute inset-x-0 top-[3px] h-[8px] rounded-full bg-raise" />
       {band && (
         <div
           aria-hidden
-          className="absolute top-0 h-[14px] rounded-[2px] border-x border-paper-faint bg-paper/10"
+          className="absolute top-0 h-[14px] rounded-lg border-x border-fg-faint bg-fg/10"
           style={{ left: pct(band.min), width: `calc(${pct(band.max)} - ${pct(band.min)})` }}
         />
       )}
       {value > 0 && (
         <div
           aria-hidden
-          className={cx("absolute left-0 top-[3px] h-[8px] rounded-full", reached ? "bg-go" : "bg-paper")}
+          className={cx("absolute left-0 top-[3px] h-[8px] rounded-full", reached ? "bg-volt" : "bg-fg")}
           style={{ width: pct(value) }}
         />
       )}
       {!band && target != null && target > 0 && (
-        <div aria-hidden className="absolute top-0 h-[14px] w-px bg-paper-dim" style={{ left: pct(target) }} />
+        <div aria-hidden className="absolute top-0 h-[14px] w-px bg-fg-dim" style={{ left: pct(target) }} />
       )}
     </div>
   );
@@ -108,16 +108,16 @@ export function Pips({ done, target, className, label }: { done: number; target:
   return (
     <span className={cx("inline-flex items-center gap-[3px]", className)} role="img" aria-label={label}>
       {Array.from({ length: n }, (_, i) => (
-        <span key={i} className={cx("h-[7px] w-[7px] rounded-full border", i < done ? "border-paper bg-paper" : "border-paper-faint/70")} />
+        <span key={i} className={cx("h-[7px] w-[7px] rounded-full border", i < done ? "border-fg bg-fg" : "border-fg-faint/70")} />
       ))}
-      {done > n && <span className="ml-0.5 text-[10px] leading-none text-paper-dim">+{done - n}</span>}
+      {done > n && <span className="ml-0.5 text-[10px] leading-none text-fg-dim">+{done - n}</span>}
     </span>
   );
 }
 
 /** Caption label in the drawing-sheet style. */
 export function Caption({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("text-[11px] uppercase tracking-[0.14em] text-paper-faint", className)}>{children}</div>;
+  return <div className={cx("text-[11px] uppercase tracking-[0.08em] text-fg-faint", className)}>{children}</div>;
 }
 
 /** Link styled like a kit Button (secondary / primary / ghost), for plain hrefs such as calendar links. */
@@ -145,12 +145,12 @@ export function LinkButton({
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
       className={cx(
-        "gym-press inline-flex min-h-11 select-none items-center justify-center gap-1.5 rounded-[3px] px-3 font-mono text-[12px] uppercase tracking-[0.08em] no-underline",
+        "gym-press inline-flex min-h-11 select-none items-center justify-center gap-1.5 rounded-2xl px-3 text-[12px] uppercase tracking-[0.08em] no-underline",
         "transition-[background-color,color,filter,transform] duration-100 motion-reduce:transition-none",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper",
-        variant === "primary" && "bg-orange font-semibold text-ink active:brightness-90",
-        variant === "secondary" && "border border-paper/35 text-paper active:bg-ink-3",
-        variant === "ghost" && "text-paper-dim active:bg-ink-3/60 active:text-paper",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg",
+        variant === "primary" && "bg-volt font-semibold text-night active:brightness-90",
+        variant === "secondary" && "border border-fg/35 text-fg active:bg-raise",
+        variant === "ghost" && "text-fg-dim active:bg-raise/60 active:text-fg",
         className,
       )}
     >

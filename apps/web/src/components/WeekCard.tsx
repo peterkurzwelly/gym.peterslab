@@ -30,8 +30,8 @@ export function weekDoneText(week: WeekState, goals?: WeekGoals): string {
 
 /** The status phrase. Below the floor it says nothing: a fresh week is not a problem. */
 export function weekStatusText(week: WeekState): string | null {
-  if (week.target_reached) return "Target reached ✓";
-  if (week.floor_reached) return "Floor reached ✓";
+  if (week.target_reached) return "Full week ✓";
+  if (week.floor_reached) return "Minimum done ✓";
   return null;
 }
 
@@ -49,16 +49,16 @@ export function WeekCard({ week, block, goals, className }: WeekCardProps) {
       meta={week.phase_label}
       aria-label={`${headline}. ${weekDoneText(week, goals)}${status ? `. ${status}` : ""}`}
     >
-      <div className="font-display text-[38px] leading-[1.02] tracking-[-0.01em] text-paper">{headline}</div>
-      <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-[15px] text-paper">
+      <div className="font-display text-[38px] leading-[1.02] tracking-[-0.01em] text-fg">{headline}</div>
+      <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-[15px] text-fg">
         <span className="whitespace-nowrap">{weekDoneText(week, goals)}</span>
-        {status && <Seg className="font-medium text-go">{status}</Seg>}
-        {week.bonus_done > 0 && <Seg className="text-paper-dim">+{week.bonus_done} bonus</Seg>}
+        {status && <Seg className="font-medium text-volt">{status}</Seg>}
+        {week.bonus_done > 0 && <Seg className="text-fg-dim">+{week.bonus_done} bonus</Seg>}
       </p>
-      {hint && <p className="mt-1 text-[13px] leading-snug text-paper-dim">{hint}</p>}
+      {hint && <p className="mt-1 text-[13px] leading-snug text-fg-dim">{hint}</p>}
       <BlockDots dots={block.dots} className="mt-4" />
       {block.extension_weeks > 0 && (
-        <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-paper-faint">
+        <p className="mt-2 text-[11px] uppercase tracking-[0.08em] text-fg-faint">
           Block runs {block.extension_weeks} {block.extension_weeks === 1 ? "week" : "weeks"} longer
         </p>
       )}
@@ -70,18 +70,18 @@ export function WeekCard({ week, block, goals, className }: WeekCardProps) {
 function Seg({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span className="whitespace-nowrap">
-      <span className="mr-2 text-paper-faint">·</span>
+      <span className="mr-2 text-fg-faint">·</span>
       <span className={className}>{children}</span>
     </span>
   );
 }
 
 const DOT_CLASS: Record<DotState, string> = {
-  target: "bg-go border-go",
-  floor: "bg-go-dim border-go",
+  target: "bg-volt border-volt",
+  floor: "bg-volt-dim border-volt",
   // A below floor week still kept the streak alive: a calm solid dot, never a warning.
-  below_floor: "bg-paper-faint border-paper-faint",
-  current: "border-paper border-[1.5px] bg-transparent",
+  below_floor: "bg-fg-faint border-fg-faint",
+  current: "border-fg border-[1.5px] bg-transparent",
   future: "border-line bg-transparent",
 };
 
@@ -103,7 +103,7 @@ export function BlockDots({ dots, className }: { dots: DotState[]; className?: s
         {dots.map((d, i) => (
           <li key={i} className="flex flex-col items-center gap-1.5">
             <span className={cx("h-[15px] w-[15px] rounded-full border", DOT_CLASS[d])} />
-            <span className={cx("text-[9.5px] tabular-nums", d === "current" ? "text-paper" : "text-paper-faint")}>{i + 1}</span>
+            <span className={cx("text-[9.5px] tabular-nums", d === "current" ? "text-fg" : "text-fg-faint")}>{i + 1}</span>
           </li>
         ))}
       </ol>
@@ -116,12 +116,12 @@ export function WeekLine({ week, blockWeeks, goals, className }: { week: WeekSta
   const status = weekStatusText(week);
   return (
     <p className={cx("flex flex-wrap items-baseline gap-x-2 text-[14px]", className)}>
-      <span className="whitespace-nowrap text-paper">
+      <span className="whitespace-nowrap text-fg">
         Week {week.training_week}
         {blockWeeks ? ` of ${blockWeeks}` : ""}
       </span>
-      <Seg className="text-paper">{weekDoneText(week, goals)}</Seg>
-      {status && <Seg className="font-medium text-go">{status}</Seg>}
+      <Seg className="text-fg">{weekDoneText(week, goals)}</Seg>
+      {status && <Seg className="font-medium text-volt">{status}</Seg>}
     </p>
   );
 }

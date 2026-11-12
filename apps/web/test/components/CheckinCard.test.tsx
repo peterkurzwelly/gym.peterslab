@@ -35,14 +35,29 @@ describe("CheckinCard", () => {
     expect(screen.getByRole("radio", { name: "Soreness 1 very sore" })).toBeTruthy();
   });
 
-  it("skip calls onSkip and collapses", () => {
+  it("skip calls onSkip and collapses; the parent's skipped flag names the row", () => {
     const onSkip = vi.fn();
     const onSave = vi.fn();
-    render(<CheckinCard value={null} onSave={onSave} onSkip={onSkip} />);
+    const { rerender } = render(<CheckinCard value={null} onSave={onSave} onSkip={onSkip} />);
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(onSkip).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByRole("region", { name: "Daily check-in" })).toBeNull();
+    rerender(<CheckinCard value={null} skipped onSave={onSave} onSkip={onSkip} />);
     expect(screen.getByRole("button", { name: /Check-in skipped/ })).toBeTruthy();
+  });
+
+  it("startOpen={false} starts as one quiet row and opens the form on tap", () => {
+    const onSave = vi.fn();
+    render(<CheckinCard value={null} startOpen={false} onSave={onSave} onSkip={() => {}} />);
+    expect(screen.queryByRole("region", { name: "Daily check-in" })).toBeNull();
+    expect(screen.queryByRole("radio")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Slept badly or drained\?.*Check in$/ }));
+    expect(screen.getByRole("region", { name: "Daily check-in" })).toBeTruthy();
+    for (const m of ["Sleep", "Soreness", "Stress", "Energy"]) pick(`${m} 4`);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSave).toHaveBeenCalledWith({ sleep: 4, soreness: 4, stress: 4, energy: 4 });
+    expect(screen.getByRole("button", { name: /Check-in 4\/5/ })).toBeTruthy();
   });
 
   it("a saved check-in starts collapsed; editing and closing does not skip", () => {

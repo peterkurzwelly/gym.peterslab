@@ -134,6 +134,63 @@ describe("POST /api/import", () => {
     }
   });
 
+  it("body_log travels through export, merge and replace", async () => {
+    const days = [
+      fixtures.body_log(),
+      fixtures.body_log({ id: "bd_2026-11-03", date: "2026-11-03", weight_kg: 84.1, waist_cm: null, note: null }),
+      fixtures.body_log({ id: "bd_2026-11-04", date: "2026-11-04", deleted_at: T1, updated_at: T1 }),
+    ];
+    await sync({ changes: { body_log: days, settings: [fixtures.settings()] } });
+    const exported = await exportFile();
+    expect(exported.tables.body_log).toEqual(days);
+    expect(exported.tables.settings).toEqual([fixtures.settings()]);
+
+    // Merge into an empty database: every row lands as it was.
+    await resetDb();
+    const merged = (await (await post("/api/import?mode=merge", exported)).json()) as { counts: Record<string, { received: number; written: number; deleted: number }> };
+    expect(merged.counts.body_log).toEqual({ received: 3, written: 3, deleted: 0 });
+    expect((await exportFile()).tables.body_log).toEqual(days);
+
+    // Replace with a file that holds one day: the other live day is soft deleted, the deleted one stays deleted.
+    const res = await post("/api/import?mode=replace", file({ body_log: [days[0]!], settings: [fixtures.settings()] }));
+    const body = (await res.json()) as typeof merged;
+    expect(body.counts.body_log).toEqual({ received: 1, written: 1, deleted: 1 });
+    const after = Object.fromEntries((await exportFile()).tables.body_log!.map((r) => [r.id, r]));
+    expect(after["bd_2026-11-02"]).toMatchObject({ weight_kg: 84.35, deleted_at: null });
+    expect(after["bd_2026-11-03"]!.deleted_at).not.toBeNull();
+    expect(after["bd_2026-11-04"]).toEqual(days[2]);
+  });
+
+  it("an export written before body_log and the body settings existed still imports", async () => {
+    const {
+      sex: _s, birth_year: _b, height_cm: _h, job_activity: _j, goal: _g, cut_rate_pct: _c,
+      goal_weight_kg: _gw, kcal_override: _k, protein_override_g: _p, steps_target: _st,
+      body_adjust_since: _as, body_adjust_base_kcal: _ab,
+      ...oldSettings
+    } = fixtures.settings();
+    const { body_log: _body, ...oldTables } = allFixtures();
+    const old = file({ ...oldTables, settings: [oldSettings] });
+    expect(ExportFile.safeParse(old).success).toBe(true);
+
+    const merge = await post("/api/import?mode=merge", old);
+    expect(merge.status).toBe(200);
+    const merged = (await merge.json()) as { counts: Record<string, { received: number; written: number; deleted: number }>; rejected: unknown[] };
+    expect(merged.rejected).toEqual([]);
+    expect(merged.counts.body_log).toEqual({ received: 0, written: 0, deleted: 0 });
+    expect(merged.counts.settings).toEqual({ received: 1, written: 1, deleted: 0 });
+    const out = await exportFile();
+    expect(out.tables.body_log).toEqual([]);
+    expect(out.tables.settings![0]).toMatchObject({ sex: null, goal: "cut", cut_rate_pct: 0.5, steps_target: 8000, job_activity: "desk", body_adjust_since: null, body_adjust_base_kcal: 0 });
+
+    // Replace with the old file: body logs made since are soft deleted like any row missing from the file.
+    await sync({ changes: { body_log: [fixtures.body_log({ updated_at: T2 })] } });
+    const replace = await post("/api/import?mode=replace", old);
+    expect(replace.status).toBe(200);
+    const replaced = (await replace.json()) as typeof merged;
+    expect(replaced.counts.body_log).toEqual({ received: 0, written: 0, deleted: 1 });
+    expect((await exportFile()).tables.body_log![0]!.deleted_at).not.toBeNull();
+  });
+
   it("replace: refuses a file with invalid rows and changes nothing", async () => {
     await sync({ changes: { checkin: [fixtures.checkin()] } });
     const res = await post("/api/import?mode=replace", file({ session: [fixtures.session(), { id: "broken" }] }));

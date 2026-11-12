@@ -4,8 +4,8 @@ import { expect, type APIRequestContext, type BrowserContext, type Page } from "
 /** Monday of block week 1, 08:00 in Stockholm: the morning Peter starts. Time keeps flowing from here. */
 export const BLOCK_DAY_ONE = new Date("2026-11-09T08:00:00+01:00");
 
-/** A pending set's check button on an exercise card: "Confirm set 2", "Pick weight for set 1", "Confirm top set". */
-export const SET_CHECK = /^(Confirm|Pick weight for) (set \d+|top set)$/;
+/** The player's one big dock button: "Log Back squat set 2", "Pick weight for Plank set 1", "Log Bench press top set". */
+export const LOG_SET = /^(Log|Pick weight for) .+ (set \d+|top set)$/;
 
 /** Fresh server state for this test: every live row soft deleted (POST /api/import?mode=replace with nothing). */
 export async function resetServer(request: APIRequestContext): Promise<void> {
@@ -58,21 +58,33 @@ export async function serverRows(request: APIRequestContext, table: string): Pro
   return body.tables[table] ?? [];
 }
 
-/** The Today screen is ready to log: the first pending set's check button. */
-export async function firstSetCheck(page: Page) {
-  const btn = page.getByRole("button", { name: SET_CHECK }).first();
-  await btn.waitFor({ state: "visible" });
-  return btn;
+/** Today is ready: the hero offers the next workout. */
+export async function todayReady(page: Page) {
+  const start = page.getByRole("button", { name: "Start workout", exact: true });
+  await start.waitFor({ state: "visible" });
+  return start;
 }
 
 /**
- * Logs one set the way Peter does: tap the check. A calibration set (no weight yet) opens the inline
- * editor at a start weight, so the second tap is Done. Returns the taps used.
+ * From Today into the player: Start workout on the hero, then Start workout under the overview.
+ * Returns the taps used (2). Nothing is stored until the first set is logged.
+ */
+export async function openWorkout(page: Page): Promise<number> {
+  await (await todayReady(page)).click();
+  await page.waitForURL(/\/workout$/);
+  await page.getByRole("heading", { level: 1 }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Start workout", exact: true }).click();
+  await page.getByRole("button", { name: LOG_SET }).waitFor({ state: "visible" });
+  return 2;
+}
+
+/**
+ * Logs one set the way Peter does: tap the big button. A calibration set (no weight yet) opens the inline
+ * steppers at a start weight, so the second tap is Done. Returns the taps used.
  */
 export async function logNextSet(page: Page): Promise<number> {
-  const pending = page.getByRole("button", { name: SET_CHECK });
-  const before = await pending.count();
-  const btn = pending.first();
+  const before = (await readSetLogs(page)).length;
+  const btn = page.getByRole("button", { name: LOG_SET });
   const label = (await btn.getAttribute("aria-label")) ?? "";
   await btn.click();
   let taps = 1;
@@ -80,25 +92,32 @@ export async function logNextSet(page: Page): Promise<number> {
     await page.getByRole("button", { name: "Done", exact: true }).click();
     taps++;
   }
-  await expect(pending).toHaveCount(before - 1);
+  await expect.poll(async () => (await readSetLogs(page)).length).toBe(before + 1);
   return taps;
 }
 
-/** Logs every set of the session shown on Today. Returns how many sets were logged. */
+/** Logs every set of the session in the player, until the dock offers the finish. Returns how many sets were logged. */
 export async function logWholeSession(page: Page): Promise<number> {
-  await firstSetCheck(page);
+  const finish = page.getByRole("button", { name: "Finish workout", exact: true });
+  const log = page.getByRole("button", { name: LOG_SET });
   let logged = 0;
-  while ((await page.getByRole("button", { name: SET_CHECK }).count()) > 0) {
+  for (;;) {
+    await expect(finish.or(log)).toBeVisible();
+    if (await finish.isVisible()) return logged;
     await logNextSet(page);
     logged++;
     if (logged > 80) throw new Error("more sets than any session has");
   }
-  return logged;
 }
 
-/** Finish from the dock; lands on the summary. */
+/** Finish from the dock once every set is logged (or early, through the sheet); lands on the summary. */
 export async function finishSession(page: Page): Promise<string> {
-  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  const all = page.getByRole("button", { name: "Finish workout", exact: true });
+  if (await all.isVisible()) await all.click();
+  else {
+    await page.getByRole("button", { name: "Finish", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Finish", exact: true }).click();
+  }
   await page.waitForURL(/\/summary\/[^/]+$/);
   return page.url().split("/summary/")[1]!;
 }

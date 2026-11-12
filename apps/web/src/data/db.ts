@@ -3,7 +3,9 @@
  * plus the sync outbox and a small key/value meta table.
  */
 import { Dexie, type Table } from "dexie";
+import { Settings as SettingsSchema } from "@gym/schema";
 import type {
+  BodyLog,
   CardioLog,
   Checkin,
   Decision,
@@ -36,6 +38,19 @@ export interface MetaEntry {
   value: unknown;
 }
 
+/**
+ * Fills schema defaults into a stored settings row for fields that did not exist when it was written
+ * (evening_hour, week_killers, the body and fuel fields). Stored values, null included, are never touched,
+ * and updated_at stays as it is: the server fills the same defaults from its column defaults.
+ */
+export function fillSettingsDefaults(row: Record<string, unknown>): void {
+  for (const [key, field] of Object.entries(SettingsSchema.shape)) {
+    if (row[key] !== undefined) continue;
+    const filled = field.safeParse(undefined);
+    if (filled.success && filled.data !== undefined) row[key] = filled.data;
+  }
+}
+
 export class WorkoutDb extends Dexie {
   settings!: Table<Settings, string>;
   exercise!: Table<ExerciseRow, string>;
@@ -45,6 +60,7 @@ export class WorkoutDb extends Dexie {
   cardio_log!: Table<CardioLog, string>;
   checkin!: Table<Checkin, string>;
   decision!: Table<Decision, string>;
+  body_log!: Table<BodyLog, string>;
   outbox!: Table<OutboxEntry, number>;
   meta!: Table<MetaEntry, string>;
 
@@ -62,6 +78,15 @@ export class WorkoutDb extends Dexie {
       outbox: "++seq, table, row_id, queued_at",
       meta: "key",
     });
+    // v2: body and fuel. Adds the body_log store (one row per local date, id "bd_YYYY-MM-DD"); every other store
+    // and its rows carry over untouched. The settings row on the device gets the defaults of the new fields.
+    this.version(2)
+      .stores({ body_log: "id, date" })
+      .upgrade((tx) => tx.table("settings").toCollection().modify(fillSettingsDefaults));
+    // v3: two more settings fields (body_adjust_since, body_adjust_base_kcal). No store changes.
+    this.version(3)
+      .stores({})
+      .upgrade((tx) => tx.table("settings").toCollection().modify(fillSettingsDefaults));
   }
 
   /** Typed access to a synced table by name. */

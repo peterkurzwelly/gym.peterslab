@@ -72,7 +72,7 @@ describe("blockRows", () => {
 describe("sessionLabel", () => {
   it("names sessions plainly", () => {
     expect(sessionLabel("A", "full")).toBe("Session A");
-    expect(sessionLabel("B", "short")).toBe("★ Session B");
+    expect(sessionLabel("B", "short")).toBe("Session B · short");
     expect(sessionLabel("TRAVEL", "travel")).toBe("Travel version");
     expect(sessionLabel("CARDIO", "full")).toBe("Cardio");
   });

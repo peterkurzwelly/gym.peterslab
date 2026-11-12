@@ -1,9 +1,10 @@
 /**
- * App frame: header (title slot, sync slot, gear), content, a dock for floating bars, and the tab bar.
+ * App frame: a slim header (title slot, sync slot), content, a dock for floating bars, and the tab bar.
+ * Focus routes (a running workout, cardio) hide the header and the tab bar and bring their own top bar.
  *
  * Screens fill the slots from anywhere below the shell with portals:
- *   <ShellTitle>Session A</ShellTitle>   <ShellSync><SyncDot status="idle" /></ShellSync>
- *   <ShellDock><RestTimer … /><FinishBar … /></ShellDock>
+ *   <ShellTitle>Program</ShellTitle>   <ShellSync><SyncDot status="idle" /></ShellSync>
+ *   <ShellDock><RestTimer … /><Button … /></ShellDock>
  * The `title`, `sync` and `dock` props do the same for callers that render the shell directly.
  */
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -11,10 +12,10 @@ import { createPortal } from "react-dom";
 import { NavLink, useLocation } from "react-router-dom";
 import { cx } from "../lib/cx";
 import { installAudioUnlock } from "../lib/sound";
-import { GearIcon, PlanIcon, ProgressIcon, TodayIcon } from "./Icons";
+import { BoltIcon, DumbbellIcon, ProgressIcon, UserIcon } from "./Icons";
 
 /** Tab bar height without the safe area. */
-export const TAB_BAR_HEIGHT = 56;
+export const TAB_BAR_HEIGHT = 58;
 
 type SlotName = "title" | "sync" | "dock";
 type Slots = Record<SlotName, HTMLElement | null>;
@@ -29,7 +30,7 @@ function SlotPortal({ name, children }: { name: SlotName; children: ReactNode })
 export const ShellTitle = ({ children }: { children: ReactNode }) => <SlotPortal name="title">{children}</SlotPortal>;
 /** Put a sync indicator in the header. */
 export const ShellSync = ({ children }: { children: ReactNode }) => <SlotPortal name="sync">{children}</SlotPortal>;
-/** Float bars (rest timer, finish bar) above the tab bar. Content scrolls clear of them. */
+/** Float bars (rest timer, log button) above the tab bar. Content scrolls clear of them. */
 export const ShellDock = ({ children }: { children: ReactNode }) => <SlotPortal name="dock">{children}</SlotPortal>;
 
 export interface AppShellProps {
@@ -40,10 +41,16 @@ export interface AppShellProps {
 }
 
 const TABS = [
-  { to: "/", label: "Today", Icon: TodayIcon, end: true },
-  { to: "/plan", label: "Plan", Icon: PlanIcon, end: false },
+  { to: "/", label: "Today", Icon: BoltIcon, end: true },
+  { to: "/program", label: "Program", Icon: DumbbellIcon, end: false },
   { to: "/progress", label: "Progress", Icon: ProgressIcon, end: false },
+  { to: "/settings", label: "You", Icon: UserIcon, end: false },
 ] as const;
+
+/** Routes that take the whole screen: no header, no tab bar. */
+export function isFocusRoute(pathname: string): boolean {
+  return pathname === "/workout" || pathname.startsWith("/workout/") || pathname === "/cardio";
+}
 
 export function AppShell({ children, title, sync, dock }: AppShellProps) {
   const [titleEl, setTitleEl] = useState<HTMLElement | null>(null);
@@ -55,12 +62,12 @@ export function AppShell({ children, title, sync, dock }: AppShellProps) {
   // iOS only plays audio after a gesture: unlock on the first tap anywhere.
   useEffect(() => installAudioUnlock(), []);
 
-  // A tab opens at its top, not at the previous tab's scroll offset. Child effects run first, so a running
-  // session on Today still lands on its next set (it scrolls after a short delay).
+  // A tab opens at its top, not at the previous tab's scroll offset.
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo?.(0, 0);
   }, [pathname]);
+  const focus = isFocusRoute(pathname);
 
   // Keep content scrollable past the dock, whatever is in it.
   useLayoutEffect(() => {
@@ -75,35 +82,25 @@ export function AppShell({ children, title, sync, dock }: AppShellProps) {
   }, []);
 
   const slots: Slots = { title: titleEl, sync: syncEl, dock: dockEl };
-  const tabSpace = `calc(${TAB_BAR_HEIGHT}px + env(safe-area-inset-bottom))`;
+  const tabSpace = focus ? "env(safe-area-inset-bottom)" : `calc(${TAB_BAR_HEIGHT}px + env(safe-area-inset-bottom))`;
   // Space covered at the bottom by the tab bar and the dock. Used for padding and scroll margins.
-  const shellBottom = `calc(${TAB_BAR_HEIGHT}px + env(safe-area-inset-bottom) + ${dockHeight}px + 16px)`;
+  const shellBottom = `calc(${tabSpace} + ${dockHeight}px + 16px)`;
 
   return (
     <SlotsContext.Provider value={slots}>
-      <div className="gym-shell min-h-full bg-ink text-paper" style={{ ["--shell-bottom" as string]: shellBottom }}>
-        <header className="sticky top-0 z-30 border-b border-line bg-ink/92 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-          <div className="mx-auto flex h-12 max-w-[640px] items-center gap-2 pl-[max(16px,env(safe-area-inset-left))] pr-[max(4px,env(safe-area-inset-right))]">
-            <div ref={setTitleEl} className="shell-title min-w-0 flex-1 truncate text-[12px] uppercase tracking-[0.16em] text-paper-dim">
+      <div className="gym-shell min-h-full bg-night text-fg" style={{ ["--shell-bottom" as string]: shellBottom }}>
+        <header className={cx("sticky top-0 z-30 bg-night/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl", focus && "hidden")}>
+          <div className="mx-auto flex h-12 max-w-[640px] items-center gap-2 pl-[max(20px,env(safe-area-inset-left))] pr-[max(12px,env(safe-area-inset-right))]">
+            <div ref={setTitleEl} className="shell-title min-w-0 flex-1 truncate text-[13px] font-semibold uppercase tracking-[0.08em] text-fg-dim">
               {title ?? (
                 <span className="shell-title-default">
-                  <span className="text-paper">Workout OS</span>
-                  <span className="text-paper-faint"> · gym</span>
+                  <span className="text-fg">Workout OS</span>
                 </span>
               )}
             </div>
             <div ref={setSyncEl} className="flex shrink-0 items-center">
               {sync}
             </div>
-            <NavLink
-              to="/settings"
-              aria-label="Settings"
-              className={({ isActive }) =>
-                cx("grid h-11 w-11 shrink-0 place-items-center rounded-[3px] active:bg-ink-3", isActive ? "text-paper" : "text-paper-dim")
-              }
-            >
-              <GearIcon size={22} />
-            </NavLink>
           </div>
         </header>
 
@@ -118,7 +115,7 @@ export function AppShell({ children, title, sync, dock }: AppShellProps) {
           </div>
         </div>
 
-        <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink pb-[env(safe-area-inset-bottom)]">
+        <nav aria-label="Main" className={cx("fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-night/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl", focus && "hidden")}>
           <div className="mx-auto flex max-w-[640px]" style={{ height: TAB_BAR_HEIGHT }}>
             {TABS.map(({ to, label, Icon, end }) => (
               <NavLink
@@ -127,18 +124,13 @@ export function AppShell({ children, title, sync, dock }: AppShellProps) {
                 end={end}
                 className={({ isActive }) =>
                   cx(
-                    "gym-tab relative flex flex-1 flex-col items-center justify-center gap-1 text-[10.5px] uppercase tracking-[0.14em] transition-colors duration-100 motion-reduce:transition-none",
-                    isActive ? "text-paper" : "text-paper-faint active:text-paper-dim",
+                    "gym-tab flex flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold tracking-[0.02em] transition-colors duration-100 motion-reduce:transition-none",
+                    isActive ? "text-volt" : "text-fg-faint active:text-fg-dim",
                   )
                 }
               >
-                {({ isActive }) => (
-                  <>
-                    <span aria-hidden className={cx("absolute inset-x-6 top-0 h-[2px]", isActive ? "bg-paper" : "bg-transparent")} />
-                    <Icon size={22} />
-                    <span>{label}</span>
-                  </>
-                )}
+                <Icon size={24} strokeWidth={1.75} />
+                <span>{label}</span>
               </NavLink>
             ))}
           </div>
@@ -150,5 +142,18 @@ export function AppShell({ children, title, sync, dock }: AppShellProps) {
 
 /** Standard screen padding and rhythm. Optional: screens may lay themselves out. */
 export function Page({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("flex flex-col gap-4 px-4 pt-4", className)}>{children}</div>;
+  return <div className={cx("flex flex-col gap-4 px-4 pt-2", className)}>{children}</div>;
+}
+
+/** Big screen title in the display face, with an optional line above it. */
+export function PageTitle({ eyebrow, children, right }: { eyebrow?: ReactNode; children: ReactNode; right?: ReactNode }) {
+  return (
+    <div className="flex items-end gap-3 px-1 pb-1 pt-1">
+      <div className="min-w-0 flex-1">
+        {eyebrow && <div className="gym-label mb-1.5">{eyebrow}</div>}
+        <h1 className="m-0 font-display text-[44px] uppercase leading-[0.92] text-fg">{children}</h1>
+      </div>
+      {right}
+    </div>
+  );
 }

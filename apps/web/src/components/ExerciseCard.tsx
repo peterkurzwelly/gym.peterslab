@@ -2,7 +2,8 @@ import type { LastTime, PlannedExercise, PlannedSet } from "@gym/engine";
 import type { Equipment, SetLog } from "@gym/schema";
 import { useState } from "react";
 import { cx } from "../lib/cx";
-import { fmtLocalDate, fmtLoad, fmtRangeAmount, fmtRelativeDate, sideSuffix } from "../lib/format";
+import { effortTag, targetLine } from "../lib/effort";
+import { fmtLocalDate, fmtLoad, fmtRelativeDate, sideSuffix } from "../lib/format";
 import { AlternativesPanel } from "./AlternativesPanel";
 import { Badge } from "./Badge";
 import { SwapIcon } from "./Icons";
@@ -39,9 +40,7 @@ export interface ExerciseCardProps {
 
 /** "3 × 6–8 @ RIR 2", plus "+ top set". */
 export function exerciseSummary(ex: PlannedExercise): string {
-  const work = ex.sets.filter((s) => s.kind === "work").length;
-  const top = ex.sets.some((s) => s.kind === "top");
-  return `${work} × ${fmtRangeAmount(ex.rep_min, ex.rep_max, ex)} @ RIR ${ex.target_rir}${top ? " + top set" : ""}`;
+  return targetLine(ex);
 }
 
 /** "60 × 8, 8, 7 @ 3" when the load is constant, else "60 × 8 · 62.5 × 7". */
@@ -52,7 +51,7 @@ export function lastTimeText(last: LastTime, ex: PlannedExercise): string {
   const hideLoad = ex.bodyweight && ex.measure !== "reps" && last.sets.every((s) => s.weight === 0);
   const sameLoad = last.sets.every((s) => s.weight === last.sets[0]!.weight);
   const rirs = new Set(last.sets.map((s) => s.rir));
-  const rir = rirs.size === 1 && last.sets[0]!.rir != null ? ` @ ${last.sets[0]!.rir}` : "";
+  const rir = rirs.size === 1 && last.sets[0]!.rir != null ? `, ${effortTag(last.sets[0]!.rir)}` : "";
   if (hideLoad) return last.sets.map((s) => amount(s.reps)).join(", ") + rir;
   if (sameLoad) return `${load(last.sets[0]!.weight)} × ${last.sets.map((s) => amount(s.reps)).join(", ")}${rir}`;
   return last.sets.map((s) => `${load(s.weight)} × ${amount(s.reps)}`).join(" · ");
@@ -77,10 +76,10 @@ export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onCon
   };
 
   return (
-    <article className={cx("overflow-hidden rounded-[3px] border border-line bg-ink-2/50", className)} aria-label={ex.name}>
+    <article className={cx("overflow-hidden rounded-2xl border border-line bg-card/50", className)} aria-label={ex.name}>
       <header className="px-4 pb-3 pt-3">
         <div className="flex min-h-6 items-center gap-1.5">
-          {position != null && <span className="mr-1 text-[11px] tabular-nums tracking-[0.14em] text-paper-faint">{String(position).padStart(2, "0")}</span>}
+          {position != null && <span className="mr-1 text-[11px] tabular-nums tracking-[0.08em] text-fg-faint">{String(position).padStart(2, "0")}</span>}
           {ex.starred && (
             <Badge tone="outline" title="In the 30 min version">
               ★
@@ -89,31 +88,31 @@ export function ExerciseCard({ exercise: ex, logged, activeSetIndex, pain, onCon
           {ex.superset_group && !circuit && <Badge tone="neutral">Superset {ex.superset_group}</Badge>}
           {ex.swapped && <Badge tone="neutral">{SWAP_LABEL[ex.swapped]}</Badge>}
           {ex.stalled && <Badge tone="neutral">Stalled</Badge>}
-          <span className="ml-auto text-[11px] tabular-nums text-paper-faint">
+          <span className="ml-auto text-[11px] tabular-nums text-fg-faint">
             {doneCount}/{ex.sets.length}
           </span>
         </div>
         <div className="mt-1.5 flex items-start gap-2">
-          <h3 className="m-0 min-w-0 flex-1 text-[19px] font-medium leading-tight text-paper">{ex.name}</h3>
+          <h3 className="m-0 min-w-0 flex-1 text-[19px] font-medium leading-tight text-fg">{ex.name}</h3>
           {canSwap && (
             <button
               type="button"
               aria-expanded={altOpen}
               onClick={() => setAltOpen((o) => !o)}
-              className={cx("-mr-2 -mt-2 flex h-11 shrink-0 items-center gap-1.5 rounded-[3px] px-2 text-[12px] uppercase tracking-[0.1em] active:bg-ink-3", altOpen ? "text-paper" : "text-paper-dim")}
+              className={cx("-mr-2 -mt-2 flex h-11 shrink-0 items-center gap-1.5 rounded-2xl px-2 text-[12px] uppercase tracking-[0.06em] active:bg-raise", altOpen ? "text-fg" : "text-fg-dim")}
             >
               <SwapIcon size={18} /> Swap
             </button>
           )}
         </div>
-        <p className="mt-1 text-[14px] tabular-nums text-paper-dim">{exerciseSummary(ex)}</p>
-        <p className="mt-1.5 text-[12.5px] leading-snug text-paper-faint">{ex.reason}</p>
+        <p className="mt-1 text-[14px] tabular-nums text-fg-dim">{exerciseSummary(ex)}</p>
+        <p className="mt-1.5 text-[12.5px] leading-snug text-fg-faint">{ex.reason}</p>
         {ex.last_time && ex.last_time.sets.length > 0 && (
-          <p className="mt-1 text-[12.5px] leading-snug text-paper-faint">
-            Last time · {today ? fmtRelativeDate(ex.last_time.date, today) : fmtLocalDate(ex.last_time.date)} · <span className="tabular-nums text-paper-dim">{lastTimeText(ex.last_time, ex)}</span>
+          <p className="mt-1 text-[12.5px] leading-snug text-fg-faint">
+            Last time · {today ? fmtRelativeDate(ex.last_time.date, today) : fmtLocalDate(ex.last_time.date)} · <span className="tabular-nums text-fg-dim">{lastTimeText(ex.last_time, ex)}</span>
           </p>
         )}
-        {ex.note && <p className="mt-1 text-[12.5px] italic leading-snug text-paper-faint">{ex.note}</p>}
+        {ex.note && <p className="mt-1 text-[12.5px] italic leading-snug text-fg-faint">{ex.note}</p>}
       </header>
 
       {altOpen && canSwap && onSwap && (

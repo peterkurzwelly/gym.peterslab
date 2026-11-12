@@ -48,9 +48,9 @@ export function ExercisePicker({ exercises, programIds, exclude, filter, onPick,
   }, [exercises, exclude, filter, programIds, query]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-[3px] border border-paper/30 bg-ink p-3" role="group" aria-label={title}>
+    <div className="flex flex-col gap-2 rounded-2xl border border-fg/30 bg-night p-3" role="group" aria-label={title}>
       <div className="flex items-center justify-between gap-2">
-        <label htmlFor={searchId} className="text-[11px] uppercase tracking-[0.14em] text-paper-faint">
+        <label htmlFor={searchId} className="text-[11px] uppercase tracking-[0.08em] text-fg-faint">
           {title}
         </label>
         <Button variant="ghost" size="sm" onClick={onCancel}>
@@ -75,21 +75,21 @@ export function ExercisePicker({ exercises, programIds, exclude, filter, onPick,
             <button
               type="button"
               onClick={() => onPick(ex.id)}
-              className="gym-press flex min-h-11 w-full items-center gap-3 rounded-[3px] px-1 py-1.5 text-left active:bg-ink-3"
+              className="gym-press flex min-h-11 w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left active:bg-raise"
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] text-paper">{ex.name}</span>
-                <span className="block text-[11.5px] text-paper-faint">
+                <span className="block truncate text-[14px] text-fg">{ex.name}</span>
+                <span className="block text-[11.5px] text-fg-faint">
                   {EQUIPMENT[ex.equipment] ?? ex.equipment}
                   {programIds?.has(ex.id) ? " · in your program" : ""}
                   {ex.custom ? " · custom" : ""}
                 </span>
               </span>
-              <PlusIcon size={18} className="shrink-0 text-paper-dim" />
+              <PlusIcon size={18} className="shrink-0 text-fg-dim" />
             </button>
           </li>
         ))}
-        {rows.length === 0 && <li className="px-1 py-3 text-[13px] text-paper-faint">Nothing matches. Try a shorter word.</li>}
+        {rows.length === 0 && <li className="px-1 py-3 text-[13px] text-fg-faint">Nothing matches. Try a shorter word.</li>}
       </ul>
     </div>
   );

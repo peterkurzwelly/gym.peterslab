@@ -157,10 +157,10 @@ export function DataSection({ index }: { index: string }) {
             </Button>
 
             {file && (
-              <div className="flex flex-col gap-3 rounded-[3px] border border-line p-3">
+              <div className="flex flex-col gap-3 rounded-2xl border border-line p-3">
                 <div className="text-[13px] leading-snug">
-                  <div className="truncate text-paper">{file.name}</div>
-                  <div className="text-paper-faint">
+                  <div className="truncate text-fg">{file.name}</div>
+                  <div className="text-fg-faint">
                     Exported {exportedAt} UTC · {exportRowCount(file.data)} rows
                   </div>
                 </div>
@@ -173,15 +173,15 @@ export function DataSection({ index }: { index: string }) {
                     setConfirm(null);
                   }}
                 />
-                <p className="text-[12.5px] leading-snug text-paper-dim">
+                <p className="text-[12.5px] leading-snug text-fg-dim">
                   {mode === "merge"
                     ? "Merge keeps everything and takes the newer version of each row."
                     : "Replace makes the target match the file. Rows that are not in the file are removed (settings stay)."}
                 </p>
 
                 {confirm ? (
-                  <div className="flex flex-col gap-2 rounded-[3px] border border-dashed border-paper-faint/70 p-3" role="group" aria-label="Confirm replace">
-                    <p className="text-[13px] leading-snug text-paper">
+                  <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-fg-faint/70 p-3" role="group" aria-label="Confirm replace">
+                    <p className="text-[13px] leading-snug text-fg">
                       {confirm === "local"
                         ? "Replace this phone with the file? Sessions not in the file are removed here and on the server at the next sync."
                         : "Replace the server with the file? Rows not in the file are removed on the server and then on this phone."}
@@ -232,7 +232,7 @@ export function DataSection({ index }: { index: string }) {
               </Readout>
             </div>
             {storage?.persisted === false && (
-              <p className="text-[12.5px] leading-snug text-paper-dim">Open the app from the home screen icon. Safari keeps a home screen app's data. Export now and then to be safe.</p>
+              <p className="text-[12.5px] leading-snug text-fg-dim">Open the app from the home screen icon. Safari keeps a home screen app's data. Export now and then to be safe.</p>
             )}
           </Field>
         </div>

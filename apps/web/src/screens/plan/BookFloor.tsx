@@ -68,7 +68,7 @@ export interface BookFloorProps {
   label?: string;
 }
 
-export function BookFloor({ state, ctx, className, label = "Book the floor" }: BookFloorProps) {
+export function BookFloor({ state, ctx, className, label = "Book your workouts" }: BookFloorProps) {
   const [time, setTimeState] = useState(readTime);
   const floor = ctx.config.week.strength_floor;
   const win = useMemo(() => bookingWindow(state, ctx.now, ctx.settings.timezone, floor, time), [state, ctx.now, ctx.settings.timezone, floor, time]);
@@ -103,7 +103,7 @@ export function BookFloor({ state, ctx, className, label = "Book the floor" }: B
         title: `Workout · Session ${code}`,
         start: zonedIso(date, time, ctx.settings.timezone),
         minutes,
-        notes: `Floor session ${i + 1} of ${sorted.length}${name}. Short on time? The ★ 30 min version counts fully. gym.peterslab.app`,
+        notes: `Workout ${i + 1} of ${sorted.length}${name}. Short on time? The 30 min version counts fully. gym.peterslab.app`,
       },
     };
   });
@@ -113,13 +113,13 @@ export function BookFloor({ state, ctx, className, label = "Book the floor" }: B
 
   return (
     <Card label={label} meta={weekRangeText(win)} className={className}>
-      <h3 className="m-0 font-display text-[28px] font-normal leading-[1.05] text-paper">
-        {two ? "Book your two floor sessions" : "Book your floor session"}
+      <h3 className="m-0 font-display text-[28px] font-normal leading-[1.05] text-fg">
+        {two ? "Book your two must-do workouts" : "Book your must-do workout"}
       </h3>
-      <p className="mt-1.5 text-[13px] leading-snug text-paper-dim">
+      <p className="mt-1.5 text-[13px] leading-snug text-fg-dim">
         {two
           ? `${win.which === "next" ? "Next week" : "This week"}: two sessions in the calendar are the week. The rest is upside.`
-          : "One more strength session reaches this week's floor. Put it in the calendar."}
+          : "One more workout reaches this week's minimum. Put it in the calendar."}
       </p>
 
       <Caption className="mt-4">Days</Caption>
@@ -152,7 +152,7 @@ export function BookFloor({ state, ctx, className, label = "Book the floor" }: B
       </div>
 
       {events.length === 0 ? (
-        <p className="mt-4 text-[13px] text-paper-faint">Pick a day above to add it to your calendar.</p>
+        <p className="mt-4 text-[13px] text-fg-faint">Pick a day above to add it to your calendar.</p>
       ) : (
         <ul className="m-0 mt-4 list-none divide-y divide-line/70 border-t border-line/70 p-0">
           {events.map((e, i) => {
@@ -161,10 +161,10 @@ export function BookFloor({ state, ctx, className, label = "Book the floor" }: B
             return (
               <li key={e.date} className="flex flex-col gap-2 py-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[14px] text-paper">
+                  <span className="text-[14px] text-fg">
                     {fmtLocalDate(e.date)} · {time}
                   </span>
-                  <span className="shrink-0 text-[12px] text-paper-dim">
+                  <span className="shrink-0 text-[12px] text-fg-dim">
                     Session {e.code} · {fmtApproxMin(e.event.minutes)}
                   </span>
                 </div>

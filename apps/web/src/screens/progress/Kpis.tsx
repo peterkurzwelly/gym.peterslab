@@ -8,13 +8,13 @@ import { e1rmTrend, volumeSummary, type E1rmSeries } from "./model";
 
 function Tile({ label, value, unit, sub, go, className }: { label: string; value: string; unit?: string; sub: string; go?: boolean; className?: string }) {
   return (
-    <div className={cx("flex min-h-[112px] flex-col justify-between gap-2 rounded-[3px] border bg-ink-2/50 px-3 py-3", go ? "border-go/45" : "border-line", className)}>
-      <span className="text-[10.5px] uppercase leading-tight tracking-[0.12em] text-paper-faint">{label}</span>
-      <span className="text-[24px] font-semibold leading-none text-paper [font-variant-numeric:normal]">
+    <div className={cx("flex min-h-[112px] flex-col justify-between gap-2 rounded-[20px] bg-card px-3.5 py-3.5", go && "ring-1 ring-volt/50", className)}>
+      <span className="gym-label">{label}</span>
+      <span className="font-display text-[30px] leading-none text-fg">
         {value}
-        {unit && <span className="ml-1 text-[12px] font-normal text-paper-dim">{unit}</span>}
+        {unit && <span className="ml-1 font-sans text-[12px] font-medium text-fg-dim">{unit}</span>}
       </span>
-      <span className={cx("text-[12px] leading-snug", go ? "text-go" : "text-paper-dim")}>{sub}</span>
+      <span className={cx("text-[12px] leading-snug", go ? "text-volt" : "text-fg-dim")}>{sub}</span>
     </div>
   );
 }
@@ -36,17 +36,24 @@ export function Kpis({ state, ctx, e1rm }: { state: EngineState; ctx: EngineCont
   return (
     <div className="grid grid-cols-2 gap-2">
       <Tile
-        label="Sessions this week"
+        label="This week"
         value={`${done} of ${goals.strength_target + goals.cardio_target}`}
-        sub={status ?? (week.strength_done >= goals.strength_floor ? "Floor reached" : `Floor is ${goals.strength_floor} strength`)}
+        sub={
+          status ??
+          (week.strength_done >= goals.strength_floor
+            ? "Minimum done"
+            : week.strength_done === 0
+              ? `Minimum is ${goals.strength_floor} workouts`
+              : `${week.strength_done} of ${goals.strength_floor} workouts for the minimum`)
+        }
         go={week.floor_reached}
       />
       {vs.band ? (
         <Tile
           label="Sets per muscle"
           value={`${vs.in_band} of ${vs.muscles}`}
-          unit="in band"
-          sub={vs.below || vs.above ? [vs.below ? `${vs.below} below` : null, vs.above ? `${vs.above} above` : null].filter(Boolean).join(" · ") : `All in ${fmtRange(vs.band.min, vs.band.max)}`}
+          unit="on target"
+          sub={vs.below || vs.above ? [vs.below ? `${vs.below} low` : null, vs.above ? `${vs.above} high` : null].filter(Boolean).join(" · ") : `All at ${fmtRange(vs.band.min, vs.band.max)} sets`}
           go={vs.in_band === vs.muscles}
         />
       ) : (
@@ -54,14 +61,14 @@ export function Kpis({ state, ctx, e1rm }: { state: EngineState; ctx: EngineCont
           label="Sets per muscle"
           value={String(vs.average)}
           unit="avg"
-          sub={`Band ${fmtRange(ctx.config.volume.band_min, ctx.config.volume.band_max)} from week ${bandWeek ?? 5}`}
+          sub={`Aim is ${fmtRange(ctx.config.volume.band_min, ctx.config.volume.band_max)} from week ${bandWeek ?? 5}`}
         />
       )}
-      <Tile label="Cardio vs WHO" value={`${who}`} unit={`of ${whoTarget} min`} sub={who >= whoTarget ? "WHO minutes reached ✓" : `Cardio ${week.cardio_done} of ${goals.cardio_target} · walks count`} go={who >= whoTarget} />
+      <Tile label="Active minutes" value={`${who}`} unit={`of ${whoTarget}`} sub={who >= whoTarget ? "Weekly minutes reached ✓" : `Cardio ${week.cardio_done} of ${goals.cardio_target} · walks count`} go={who >= whoTarget} />
       <Tile
-        label="Main lifts e1RM"
+        label="Strength"
         value={trend.pct == null ? "Soon" : pctText(trend.pct)}
-        sub={trend.pct == null ? "Shows after two sessions per lift" : `Avg since first session · ${trend.lifts} ${trend.lifts === 1 ? "lift" : "lifts"}`}
+        sub={trend.pct == null ? "Shows after two workouts per lift" : `Since your first workout · ${trend.lifts} main ${trend.lifts === 1 ? "lift" : "lifts"}`}
       />
     </div>
   );

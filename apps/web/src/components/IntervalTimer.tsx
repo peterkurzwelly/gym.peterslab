@@ -142,9 +142,9 @@ export function IntervalTimer({ plan, onComplete, sound = true, initialRun, onRu
   if (finished) {
     return (
       <div className={cx("flex flex-col items-center gap-2 py-8 text-center", className)}>
-        <div className="text-[11px] uppercase tracking-[0.16em] text-paper-faint">Cardio</div>
-        <div className="font-display text-[52px] leading-none text-paper">Done</div>
-        <p className="text-[15px] tabular-nums text-paper-dim">
+        <div className="text-[11px] uppercase tracking-[0.08em] text-fg-faint">Cardio</div>
+        <div className="font-display text-[52px] leading-none text-fg">Done</div>
+        <p className="text-[15px] tabular-nums text-fg-dim">
           {fmtClock(finished.minutes * 60)} total{finished.hardMinutes > 0 ? ` · ${finished.hardMinutes} min hard` : ""}
         </p>
       </div>
@@ -153,7 +153,7 @@ export function IntervalTimer({ plan, onComplete, sound = true, initialRun, onRu
 
   return (
     <div className={cx("flex flex-col gap-5", className)}>
-      <div className="flex items-baseline justify-between text-[11px] uppercase tracking-[0.14em] text-paper-faint">
+      <div className="flex items-baseline justify-between text-[11px] uppercase tracking-[0.08em] text-fg-faint">
         <span>{plan.kind === "intervals" && plan.intervals ? `Intervals · ${plan.intervals.count} × ${plan.intervals.hard_min} min` : "Easy cardio"}</span>
         <span className="tabular-nums">
           {fmtClock(Math.min(elapsed, totalS))} / {fmtClock(totalS)}
@@ -161,12 +161,12 @@ export function IntervalTimer({ plan, onComplete, sound = true, initialRun, onRu
       </div>
 
       <div className="flex flex-col items-center gap-1 py-2 text-center" aria-live="polite">
-        <div className={cx("font-display text-[56px] leading-none", isHard ? "text-paper" : "text-paper-dim")}>{seg?.label ?? "Ready"}</div>
-        <div className="font-mono text-[84px] font-semibold leading-none tabular-nums tracking-[-0.04em] text-paper" role="timer" aria-label={`${fmtClock(shownLeft)} left in ${seg?.label ?? "segment"}`}>
+        <div className={cx("font-display text-[56px] leading-none", isHard ? "text-fg" : "text-fg-dim")}>{seg?.label ?? "Ready"}</div>
+        <div className="text-[84px] font-semibold leading-none tabular-nums tracking-[-0.04em] text-fg" role="timer" aria-label={`${fmtClock(shownLeft)} left in ${seg?.label ?? "segment"}`}>
           {fmtClock(shownLeft)}
         </div>
-        <div className="mt-2 min-h-5 text-[13px] text-paper-dim">{nextSeg ? `Next · ${nextSeg.label} · ${fmtClock(nextSeg.seconds)}` : run ? "Last segment" : ""}</div>
-        {isHard && <p className="mt-1 max-w-[30ch] text-[12px] leading-snug text-paper-faint">{plan.hard_description}</p>}
+        <div className="mt-2 min-h-5 text-[13px] text-fg-dim">{nextSeg ? `Next · ${nextSeg.label} · ${fmtClock(nextSeg.seconds)}` : run ? "Last segment" : ""}</div>
+        {isHard && <p className="mt-1 max-w-[30ch] text-[12px] leading-snug text-fg-faint">{plan.hard_description}</p>}
       </div>
 
       <SegmentBar plan={plan} elapsed={elapsed} />
@@ -206,8 +206,8 @@ function SegmentBar({ plan, elapsed }: { plan: CardioPlan; elapsed: number }) {
         const done = Math.max(0, Math.min(1, (elapsed - acc) / s.seconds));
         acc += s.seconds;
         return (
-          <div key={i} className={cx("relative h-full overflow-hidden rounded-[1px]", s.kind === "hard" ? "bg-paper/25" : "bg-line")} style={{ flexGrow: s.seconds, flexBasis: 0 }}>
-            <div className={cx("absolute inset-y-0 left-0", s.kind === "hard" ? "bg-paper" : "bg-paper-faint")} style={{ width: `${done * 100}%` }} />
+          <div key={i} className={cx("relative h-full overflow-hidden rounded", s.kind === "hard" ? "bg-fg/25" : "bg-line")} style={{ flexGrow: s.seconds, flexBasis: 0 }}>
+            <div className={cx("absolute inset-y-0 left-0", s.kind === "hard" ? "bg-fg" : "bg-fg-faint")} style={{ width: `${done * 100}%` }} />
           </div>
         );
       })}

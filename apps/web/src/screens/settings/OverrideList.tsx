@@ -51,7 +51,7 @@ export function OverrideList(props: OverrideListProps) {
 
   return (
     <div className="flex flex-col">
-      {ids.length === 0 && !picking && <p className="py-1 text-[13px] text-paper-faint">{emptyText}</p>}
+      {ids.length === 0 && !picking && <p className="py-1 text-[13px] text-fg-faint">{emptyText}</p>}
       {ids.length > 0 && (
         <ul className="m-0 flex list-none flex-col divide-y divide-line/70 p-0">
           {ids.map((id) => {
@@ -66,15 +66,15 @@ export function OverrideList(props: OverrideListProps) {
                   type="button"
                   aria-expanded={isOpen}
                   onClick={() => setOpen(isOpen ? null : id)}
-                  className="gym-press flex min-h-11 w-full items-center gap-3 rounded-[3px] text-left active:bg-ink-3"
+                  className="gym-press flex min-h-11 w-full items-center gap-3 rounded-2xl text-left active:bg-raise"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] text-paper">{name}</span>
-                    {fallback != null && fallback !== value && <span className="block text-[11.5px] text-paper-faint">default {format(fallback)}</span>}
+                    <span className="block truncate text-[14px] text-fg">{name}</span>
+                    {fallback != null && fallback !== value && <span className="block text-[11.5px] text-fg-faint">default {format(fallback)}</span>}
                   </span>
-                  <span className="shrink-0 font-mono text-[15px] tabular-nums text-paper">
+                  <span className="shrink-0 text-[15px] tabular-nums text-fg">
                     {format(value)}
-                    {unit && <span className="ml-1 text-[11px] text-paper-dim">{unit}</span>}
+                    {unit && <span className="ml-1 text-[11px] text-fg-dim">{unit}</span>}
                   </span>
                 </button>
                 {isOpen && (

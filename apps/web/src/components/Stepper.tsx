@@ -40,11 +40,11 @@ export function Stepper({ value, onChange, step, min = 0, max = Infinity, label,
     setTyping(false);
   };
 
-  const stepBtn = "gym-press grid h-12 w-14 shrink-0 place-items-center rounded-[3px] border border-line text-paper active:bg-ink-3 disabled:opacity-30 transition-colors duration-100 motion-reduce:transition-none";
+  const stepBtn = "gym-press grid h-12 w-14 shrink-0 place-items-center rounded-2xl bg-raise-2 text-fg active:brightness-125 disabled:opacity-30";
 
   return (
     <div className={cx("flex items-center gap-3", className)}>
-      <span className={cx("w-16 shrink-0 text-[11px] uppercase tracking-[0.14em] text-paper-faint", hideLabel && "sr-only")}>{label}</span>
+      <span className={cx("gym-label w-16 shrink-0", hideLabel && "sr-only")}>{label}</span>
       <div className="flex flex-1 items-center gap-2">
         <button type="button" className={stepBtn} aria-label={`Decrease ${label.toLowerCase()}`} disabled={value <= min} onClick={() => onChange(clamp(value - step))}>
           <MinusIcon size={22} />
@@ -63,7 +63,7 @@ export function Stepper({ value, onChange, step, min = 0, max = Infinity, label,
               if (e.key === "Enter") commit();
               if (e.key === "Escape") setTyping(false);
             }}
-            className="h-12 min-w-0 flex-1 rounded-[3px] border border-paper/60 bg-ink text-center font-mono text-[22px] font-semibold tabular-nums text-paper outline-none"
+            className="h-12 min-w-0 flex-1 rounded-2xl border border-fg/60 bg-night text-center text-[22px] font-semibold tabular-nums text-fg outline-none"
           />
         ) : (
           <button
@@ -73,10 +73,10 @@ export function Stepper({ value, onChange, step, min = 0, max = Infinity, label,
               setDraft(String(value));
               setTyping(true);
             }}
-            className="flex h-12 min-w-0 flex-1 items-baseline justify-center gap-1 rounded-[3px] font-mono tabular-nums active:bg-ink-3"
+            className="flex h-12 min-w-0 flex-1 items-baseline justify-center gap-1 rounded-2xl tabular-nums active:bg-raise"
           >
-            <span className="text-[24px] font-semibold leading-[48px] text-paper">{shown}</span>
-            {unit && <span className="text-[12px] text-paper-dim">{unit}</span>}
+            <span className="font-display text-[30px] leading-[48px] text-fg">{shown}</span>
+            {unit && <span className="text-[13px] font-medium text-fg-dim">{unit}</span>}
           </button>
         )}
         <button type="button" className={stepBtn} aria-label={`Increase ${label.toLowerCase()}`} disabled={value >= max} onClick={() => onChange(clamp(value + step))}>

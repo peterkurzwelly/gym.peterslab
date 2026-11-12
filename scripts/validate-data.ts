@@ -1,5 +1,6 @@
 /**
- * Validates data/exercises.json against the schema and config/program.json.
+ * Validates data/exercises.json against the schema and config/program.json, and data/exercise-guides.json
+ * against the library (every exercise has a how-to guide).
  * Run: node scripts/validate-data.ts   (exit code 1 on any error)
  */
 import { readFileSync } from "node:fs";
@@ -197,6 +198,33 @@ if (program.limitations.shoulder_symmetry) expectSwap("shoulder_symmetry", "C/C3
 for (const list of Object.values(swapSets)) {
   for (const s of list) if (s.to === null) warn(`${s.at}: ${s.from} hits an avoid tag and has no allowed alternative`);
 }
+
+// ---------- exercise guides (how-to text + video per exercise) ----------
+type Guide = { what?: unknown; find?: unknown; setup?: unknown; do?: unknown; feel?: unknown; avoid?: unknown; video?: unknown };
+const guides = readJson("data/exercise-guides.json") as Record<string, Guide>;
+const text = (v: unknown, max: number) => typeof v === "string" && v.trim().length > 0 && v.length <= max;
+const list = (v: unknown, lo: number, hi: number) => Array.isArray(v) && v.length >= lo && v.length <= hi && v.every((x) => text(x, 140));
+const libraryIds = new Set(library.exercises.map((e) => e.id));
+for (const id of libraryIds) if (!guides[id]) err(`guides: no guide for ${id}`);
+let guideVideos = 0;
+for (const [id, g] of Object.entries(guides)) {
+  if (!libraryIds.has(id)) err(`guides: ${id} is not in the library`);
+  if (!text(g.what, 200)) err(`guides: ${id}.what missing or too long`);
+  if (!text(g.find, 160)) err(`guides: ${id}.find missing or too long`);
+  if (!text(g.feel, 120)) err(`guides: ${id}.feel missing or too long`);
+  if (!list(g.setup, 2, 3)) err(`guides: ${id}.setup needs 2 to 3 short steps`);
+  if (!list(g.do, 2, 4)) err(`guides: ${id}.do needs 2 to 4 short steps`);
+  if (!list(g.avoid, 1, 2)) err(`guides: ${id}.avoid needs 1 to 2 short lines`);
+  if (g.video != null) {
+    const v = g.video as { id?: unknown; title?: unknown; channel?: unknown };
+    if (typeof v.id !== "string" || !/^[A-Za-z0-9_-]{11}$/.test(v.id)) err(`guides: ${id}.video.id is not a YouTube id`);
+    if (!text(v.title, 200) || !text(v.channel, 100)) err(`guides: ${id}.video needs a title and a channel`);
+    guideVideos++;
+  } else if (programIds.has(id)) {
+    warn(`guides: program exercise ${id} has no video`);
+  }
+}
+summary.push(`Guides: ${Object.keys(guides).length} exercises, ${guideVideos} with a video.`);
 
 const customCount = library.exercises.filter((e) => e.source === "custom").length;
 summary.push(`Library: ${library.exercises.length} exercises (${customCount} custom), program references ${programIds.size} ids.`);

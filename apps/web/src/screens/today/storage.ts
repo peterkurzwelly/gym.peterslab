@@ -100,3 +100,23 @@ export function readIntervalRun(sessionId: string | null | undefined): StoredInt
 export function writeIntervalRun(sessionId: string | null | undefined, run: Omit<StoredIntervalRun, "sessionId"> | null): void {
   writeJson("session", INTERVAL_KEY, sessionId && run ? { ...run, sessionId } : null);
 }
+
+// ---------- pain flags of the open workout, also for exercises without a logged set yet ----------
+const PAIN_KEY = "gym.workout.pain";
+
+interface PainStore {
+  sessionId: string;
+  flags: Record<string, boolean>;
+}
+
+/** exercise_id -> pain on or off, for this session only. */
+export function readPain(sessionId: string | null): Record<string, boolean> {
+  if (!sessionId) return {};
+  const v = readJson<PainStore>("local", PAIN_KEY);
+  return v && v.sessionId === sessionId && v.flags && typeof v.flags === "object" ? v.flags : {};
+}
+
+/** Keeps one session's flags; null clears them. */
+export function writePain(sessionId: string | null, flags: Record<string, boolean> | null): void {
+  writeJson("local", PAIN_KEY, sessionId && flags && Object.keys(flags).length > 0 ? { sessionId, flags } : null);
+}

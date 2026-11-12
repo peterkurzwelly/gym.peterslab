@@ -15,10 +15,9 @@ export function Chip({ selected = false, asRadio, className, children, type = "b
       aria-checked={asRadio ? selected : undefined}
       aria-pressed={asRadio ? undefined : selected}
       className={cx(
-        "gym-press inline-flex min-h-11 min-w-11 select-none items-center justify-center rounded-[3px] border px-3 font-mono text-[15px] tabular-nums",
-        "transition-colors duration-100 motion-reduce:transition-none",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper",
-        selected ? "border-paper bg-paper font-semibold text-ink" : "border-line text-paper active:bg-ink-3",
+        "gym-press inline-flex min-h-11 min-w-11 select-none items-center justify-center rounded-2xl px-3 text-[15px] font-semibold tabular-nums",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg",
+        selected ? "bg-fg text-night" : "bg-raise-2 text-fg active:brightness-125",
         className,
       )}
       {...rest}

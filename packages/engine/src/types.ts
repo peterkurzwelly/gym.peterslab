@@ -4,6 +4,7 @@
  * Semantics of every rule: docs/ENGINE_RULES.md.
  */
 import type {
+  BodyLog,
   CardioLog,
   CardioModality,
   Checkin,
@@ -395,5 +396,102 @@ export interface SessionSummary {
   changes: SessionChange[];
   prs: { exercise_id: string; name: string; e1rm: number; previous_best: number | null }[];
   week: WeekState;
+  decisions: Decision[];
+}
+
+// ---------------- body and fuel (ENGINE_RULES section 10) ----------------
+
+export interface BodyInput {
+  config: EngineConfig;
+  settings: Settings;
+  /** Raw rows as stored. Deleted rows and rows dated after today are ignored. */
+  bodyLogs: BodyLog[];
+  /** ISO UTC timestamp. The engine never reads the clock itself. */
+  now: string;
+}
+
+export interface BodyTargets {
+  /** null until the profile is complete (sex, birth_year, height_cm and at least one weigh-in), unless kcal_override is set. */
+  kcal: number | null;
+  /** null until there is a weight, unless protein_override_g is set. */
+  protein_g: number | null;
+  fat_min_g: number | null;
+  steps: number;
+  /** Estimate before goal offset and adjustments. null until the profile is complete. */
+  maintenance_kcal: number | null;
+  /** Negative for a cut. 0 for a cut while there is no weight yet. */
+  goal_offset_kcal: number;
+  /** Sum of the weekly adaptive adjustments. */
+  adjustments_kcal: number;
+  rule_id: string;
+  /** One plain sentence, shown under the numbers. Equals the `d:body:targets` decision's explanation. */
+  reason: string;
+}
+
+/** avg = trailing mean over the trend window, null when the window holds too few weigh-ins. */
+export interface BodyTrendPoint {
+  date: string;
+  weight: number | null;
+  avg: number | null;
+}
+
+export type BodyPace =
+  | "setup" // profile incomplete
+  | "collecting" // not enough weigh-ins for a rate yet
+  | "on_pace"
+  | "slow" // moving toward the goal, slower than the target rate minus the tolerance (or holding still)
+  | "fast" // faster than the max rate
+  | "off_goal"; // moving away from the goal (recomp: drifting either way)
+
+export type BodyMissing = "sex" | "birth_year" | "height_cm" | "weight";
+
+export interface BodyState {
+  today: string;
+  profile_complete: boolean;
+  /** What the calorie target still needs, in this order. */
+  missing: BodyMissing[];
+  log_today: BodyLog | null;
+  weighed_today: boolean;
+  protein_today: number;
+  protein_hit: boolean;
+  steps_today: number;
+  steps_hit: boolean;
+  kcal_today: number | null;
+  /** Most recent weigh-in. */
+  latest_weight: number | null;
+  /** Latest trend average. Can be older than the last weigh-in after a break: show current_weight instead. */
+  trend_weight: number | null;
+  /** The weight the targets use: the trend when it covers the last weigh-in, else that weigh-in. */
+  current_weight: number | null;
+  /** true when current_weight is the trend average, false when it is a single weigh-in. */
+  current_is_trend: boolean;
+  /** First trend value, or the first weigh-in while there is no trend yet. */
+  start_weight: number | null;
+  /** trend_weight − start_weight. */
+  change_kg: number | null;
+  /** Signed, negative = losing. */
+  rate_kg_per_week: number | null;
+  rate_pct_per_week: number | null;
+  pace: BodyPace;
+  /** Short, plain, no guilt, e.g. "On pace: down 0.4 kg a week." */
+  pace_text: string;
+  /** Whole weeks. Set when goal_weight_kg is set and the rate points toward it; 0 once the goal is reached. */
+  weeks_to_goal: number | null;
+  targets: BodyTargets;
+  /** One point per calendar day from the first log (at most the last body.series_max_days days) through today. */
+  series: BodyTrendPoint[];
+  waist: { latest: number; first: number; change_cm: number; latest_date: string } | null;
+  /** The current calendar week (Monday to Sunday) so far. */
+  week: {
+    start_date: string;
+    weigh_ins: number;
+    /** Days the protein target was hit (with the tolerance). Without a protein target: days with protein logged. */
+    protein_days: number;
+    /** Mean over the days with steps logged, whole steps. */
+    steps_avg: number | null;
+    /** Days with anything logged. */
+    days_logged: number;
+  };
+  /** The targets decision (`d:body:targets`) first, then one per weekly adjustment (`d:body:kcal:<week start>`), oldest week first. */
   decisions: Decision[];
 }

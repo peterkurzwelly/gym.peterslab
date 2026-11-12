@@ -37,23 +37,23 @@ export function RestWatcher({ sound = true }: { sound?: boolean }) {
   return null;
 }
 
-/** "Rest 1:23" in the header on the other tabs. Tap: back to Today. */
+/** "Rest 1:23" in the header on the other tabs. Tap: back to the workout. */
 export function RestChip() {
   const rest = useAnyRest();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const show = !!rest && pathname !== "/";
+  const show = !!rest && pathname !== "/workout";
   const now = useNow(show, 500);
   if (!rest || !show) return null;
   const left = fmtClock(secondsLeft(rest.endsAt, now));
   return (
     <button
       type="button"
-      onClick={() => navigate("/")}
-      aria-label={`Rest, ${left} left. Back to Today`}
-      className="gym-press mr-1 flex h-11 shrink-0 items-center gap-1.5 rounded-[3px] px-2 font-mono text-[12px] uppercase tracking-[0.1em] text-paper active:bg-ink-3"
+      onClick={() => navigate("/workout")}
+      aria-label={`Rest, ${left} left. Back to the workout`}
+      className="gym-press mr-1 flex h-11 shrink-0 items-center gap-1.5 rounded-2xl px-2 text-[12px] uppercase tracking-[0.06em] text-fg active:bg-raise"
     >
-      <span className="text-paper-faint">Rest</span>
+      <span className="text-fg-faint">Rest</span>
       <span className="tabular-nums">{left}</span>
     </button>
   );

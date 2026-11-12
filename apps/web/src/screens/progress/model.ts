@@ -172,7 +172,7 @@ export function volumeLine(volume: Flag[]): string | null {
 
 export const FLAG_CAPTION: Record<Flag["kind"], string> = {
   stall: "Stall",
-  reactive_deload: "Deload",
+  reactive_deload: "Easy week",
   deload_criteria_met: "Recovery",
   below_range: "Below range",
   readiness_trend: "Readiness",

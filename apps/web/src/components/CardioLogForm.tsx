@@ -51,12 +51,12 @@ export function CardioLogForm({ modalities, initial, onSave, onCancel, className
       }}
     >
       <div>
-        <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-paper-faint">Modality</div>
-        <ChipGroup label="Modality" value={modality} onChange={setModality} options={modalities.map((m) => ({ value: m, label: MODALITY_LABEL[m] }))} chipClassName="text-[14px]" />
+        <div className="mb-1.5 text-[11px] uppercase tracking-[0.08em] text-fg-faint">Machine</div>
+        <ChipGroup label="Machine" value={modality} onChange={setModality} options={modalities.map((m) => ({ value: m, label: MODALITY_LABEL[m] }))} chipClassName="text-[14px]" />
       </div>
       <Stepper label="Minutes" value={minutes} step={5} min={0} max={600} onChange={setMinutes} unit="min" inputMode="numeric" />
       <div className="flex items-center gap-3">
-        <span className="w-16 shrink-0 text-[11px] uppercase tracking-[0.14em] text-paper-faint">Effort</span>
+        <span className="w-16 shrink-0 text-[11px] uppercase tracking-[0.08em] text-fg-faint">Effort</span>
         <SegmentedControl
           label="Intensity"
           className="flex-1"
@@ -69,7 +69,7 @@ export function CardioLogForm({ modalities, initial, onSave, onCancel, className
         />
       </div>
       <label className="flex items-center gap-3">
-        <span className="w-16 shrink-0 text-[11px] uppercase leading-tight tracking-[0.14em] text-paper-faint">Avg HR</span>
+        <span className="w-16 shrink-0 text-[11px] uppercase leading-tight tracking-[0.08em] text-fg-faint">Avg pulse</span>
         <input
           inputMode="numeric"
           enterKeyHint="done"
@@ -77,9 +77,9 @@ export function CardioLogForm({ modalities, initial, onSave, onCancel, className
           value={hr}
           onChange={(e) => setHr(e.target.value.replace(/[^\d]/g, ""))}
           aria-invalid={!hrValid}
-          className="h-12 min-w-0 flex-1 rounded-[3px] border border-line bg-transparent px-3 font-mono text-[16px] tabular-nums text-paper placeholder:text-paper-faint focus:border-paper/60 focus:outline-none"
+          className="h-12 min-w-0 flex-1 rounded-2xl border border-line bg-transparent px-3 text-[16px] tabular-nums text-fg placeholder:text-fg-faint focus:border-fg/60 focus:outline-none"
         />
-        <span className="w-10 text-[12px] text-paper-faint">bpm</span>
+        <span className="w-10 text-[12px] text-fg-faint">bpm</span>
       </label>
       <div className="mt-1 flex gap-2">
         <Button type="submit" variant="primary" size="lg" className="flex-1" disabled={!hrValid || minutes <= 0}>

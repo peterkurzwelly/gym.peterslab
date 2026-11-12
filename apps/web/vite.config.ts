@@ -41,10 +41,10 @@ export default defineConfig({
         id: "/",
         name: "Workout OS",
         short_name: "Gym",
-        description: "Consistency first training log.",
+        description: "Training, fuel and progress in one place.",
         lang: "en",
-        theme_color: "#04261E",
-        background_color: "#04261E",
+        theme_color: "#0a0a0c",
+        background_color: "#0a0a0c",
         display: "standalone",
         orientation: "portrait",
         start_url: "/",
@@ -60,7 +60,8 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/cdn-cgi\//],
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,webmanifest}"],
+        // webp = the exercise photos in /ex (about 3.5 MB in all), so every how-to works without signal in the gym.
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,webmanifest,webp}"],
         // The exercise library and engine ship in the main chunk; keep it precached.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,

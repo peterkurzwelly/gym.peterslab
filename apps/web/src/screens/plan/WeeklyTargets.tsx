@@ -13,8 +13,8 @@ function Line({ label, value, children }: { label: string; value: string; childr
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[13.5px] text-paper">{label}</span>
-        <span className="shrink-0 text-[13px] tabular-nums text-paper-dim">{value}</span>
+        <span className="text-[13.5px] text-fg">{label}</span>
+        <span className="shrink-0 text-[13px] tabular-nums text-fg-dim">{value}</span>
       </div>
       {children}
     </div>
@@ -62,33 +62,33 @@ export function WeeklyTargets({ state, ctx }: { state: EngineState; ctx: EngineC
 
   return (
     <div className="flex flex-col gap-3">
-      <Card label="Sets per muscle" meta={band ? `Band ${fmtRange(band.min, band.max)}` : "This week · reference"}>
+      <Card label="Sets per muscle" meta={band ? `Aim ${fmtRange(band.min, band.max)} a week` : "This week"}>
         <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
           {muscles.map((m) => {
             const v = vol?.by_muscle[m] ?? 0;
             return (
               <li key={m} className="grid grid-cols-[88px_minmax(0,1fr)_40px] items-center gap-3">
-                <span className="truncate text-[13px] text-paper">{muscleLabel(m)}</span>
+                <span className="truncate text-[13px] text-fg">{muscleLabel(m)}</span>
                 <Meter value={v} max={scaleMax} band={band} reached={!!band && v >= band.min} label={`${muscleLabel(m)} ${fmtScore(v)} sets`} />
-                <span className="text-right text-[13px] tabular-nums text-paper-dim">{fmtScore(v)}</span>
+                <span className="text-right text-[13px] tabular-nums text-fg-dim">{fmtScore(v)}</span>
               </li>
             );
           })}
         </ul>
-        <p className="m-0 mt-3 text-[12px] leading-snug text-paper-faint">
+        <p className="m-0 mt-3 text-[12px] leading-snug text-fg-faint">
           {band
-            ? `Fractional sets this week: 1 per set for the main muscle, 0.5 for helpers. The bracket is the ${fmtRange(band.min, band.max)} band.`
-            : `No band in the ${week.phase_label.toLowerCase()}. Band ${fmtRange(cfgBand.min, cfgBand.max)} starts${bandWeek ? ` in week ${bandWeek}` : " later"}. Shown for reference.`}
+            ? `Hard sets per muscle this week. A set counts fully for the main muscle and half for the helpers. The bracket marks the ${fmtRange(band.min, band.max)} sets that build muscle best.`
+            : `Hard sets per muscle this week. No aim yet while you are easing back in. The ${fmtRange(cfgBand.min, cfgBand.max)} sets a week aim starts${bandWeek ? ` in week ${bandWeek}` : " later"}.`}
         </p>
       </Card>
 
-      <Card label="Cardio and walking" meta={`WHO ${whoTarget} min`}>
+      <Card label="Cardio and walking" meta={`Goal ${whoTarget} min`}>
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[13.5px] text-paper">Cardio sessions</span>
+            <span className="text-[13.5px] text-fg">Cardio sessions</span>
             <span className="flex items-center gap-3">
               <Pips done={week.cardio_done} target={cardioTarget} label={`${week.cardio_done} of ${cardioTarget} cardio sessions`} />
-              <span className={week.cardio_done >= cardioTarget ? "text-[13px] font-medium text-go" : "text-[13px] tabular-nums text-paper-dim"}>
+              <span className={week.cardio_done >= cardioTarget ? "text-[13px] font-medium text-volt" : "text-[13px] tabular-nums text-fg-dim"}>
                 {week.cardio_done >= cardioTarget ? `${week.cardio_done} of ${cardioTarget} ✓` : `${week.cardio_done} of ${cardioTarget}`}
               </span>
             </span>
@@ -96,12 +96,12 @@ export function WeeklyTargets({ state, ctx }: { state: EngineState; ctx: EngineC
           <Line label="Moderate minutes" value={`${Math.round(who)} of ${whoTarget}`}>
             <Meter value={who} target={whoTarget} max={Math.max(whoTarget * 1.2, who)} reached={who >= whoTarget} label="Moderate minutes this week" />
           </Line>
-          <p className="m-0 -mt-2 text-[12px] leading-snug text-paper-faint">Hard minutes count double. Walking counts.</p>
+          <p className="m-0 -mt-2 text-[12px] leading-snug text-fg-faint">Hard minutes count double. Walking counts.</p>
 
           <div className="border-t border-line/70 pt-3">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[13.5px] text-paper">Walking</span>
-              <span className="text-[13px] tabular-nums text-paper-dim">
+              <span className="text-[13.5px] text-fg">Walking</span>
+              <span className="text-[13px] tabular-nums text-fg-dim">
                 {week.walking_minutes} min this week · {todayWalk} today
               </span>
             </div>
@@ -114,7 +114,7 @@ export function WeeklyTargets({ state, ctx }: { state: EngineState; ctx: EngineC
               ))}
             </div>
             {last && (
-              <div className="mt-2 flex min-h-11 items-center justify-between gap-3 text-[13px] text-paper-dim">
+              <div className="mt-2 flex min-h-11 items-center justify-between gap-3 text-[13px] text-fg-dim">
                 <span>Walk logged · {last.minutes} min</span>
                 <Button variant="ghost" size="sm" disabled={busy} onClick={() => void undo()}>
                   Undo

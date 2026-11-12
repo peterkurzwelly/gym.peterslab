@@ -124,12 +124,12 @@ export function fmtRelativeDate(date: string, today: string): string {
   return fmtLocalDate(date);
 }
 
-/** Week range "9–15 Nov" or "30 Nov · 6 Dec" across months. */
+/** Week range "9–15 Nov" or "30 Nov – 6 Dec" across months. */
 export function fmtWeekRange(start: string, end: string): string {
   const a = parseLocalDate(start);
   const b = parseLocalDate(end);
   if (a.m === b.m) return `${a.d}${EN_DASH}${b.d} ${MONTHS[b.m - 1]}`;
-  return `${a.d} ${MONTHS[a.m - 1]} · ${b.d} ${MONTHS[b.m - 1]}`;
+  return `${a.d} ${MONTHS[a.m - 1]} ${EN_DASH} ${b.d} ${MONTHS[b.m - 1]}`;
 }
 
 /** Check-in average: 3.5 → "3.5", 4 → "4". */

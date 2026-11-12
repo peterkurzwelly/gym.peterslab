@@ -13,7 +13,7 @@ export interface DecisionArgs {
   explanation: string;
 }
 
-export function makeDecision(n: Norm, a: DecisionArgs): Decision {
+export function makeDecision(n: Pick<Norm, "config">, a: DecisionArgs): Decision {
   return {
     id: a.id,
     date: a.date,
@@ -52,6 +52,8 @@ export const progressionId = (sessionId: string, track: string) => fitId(`d:${se
 export const initId = (track: string) => fitId(`d:init:${track}`);
 export const planId = (date: string, code: DayCode, ruleId: string) => fitId(`d:plan:${date}:${code}:${ruleId}`);
 export const eventId = (ruleId: string, ref: string) => fitId(`d:event:${ruleId}:${ref}`);
+/** Body and fuel: `d:body:targets`, `d:body:kcal:<week start>`. */
+export const bodyId = (kind: "targets" | "kcal", ref?: string) => fitId(ref ? `d:body:${kind}:${ref}` : `d:body:${kind}`);
 
 /** Keep the first decision per id, in order. */
 export function dedupeDecisions(lists: Decision[][]): Decision[] {

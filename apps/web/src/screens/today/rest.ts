@@ -36,6 +36,11 @@ export function addRest(seconds: number): void {
   if (current) set({ ...current, endsAt: current.endsAt + seconds * 1000 });
 }
 
+/** A swap during the rest: the label names the exercise that is now up next. */
+export function renameRest(from: string, to: string): void {
+  if (current && from && to && from !== to && current.label.endsWith(`· ${from}`)) set({ ...current, label: current.label.slice(0, -from.length) + to });
+}
+
 export function clearRest(): void {
   if (current) set(null);
 }

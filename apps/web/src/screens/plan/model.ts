@@ -126,11 +126,11 @@ export function walksOn(cardioLogs: CardioLog[], date: string): CardioLog[] {
   return cardioLogs.filter((c) => c.session_id == null && c.modality === "walk" && c.date === date && !c.deleted_at);
 }
 
-/** "Session A", "★ Session B", "Travel version", "Cardio". */
+/** "Session A", "Session B · short", "Travel version", "Cardio". */
 export function sessionLabel(code: DayCode, mode: Session["mode"]): string {
   if (code === "CARDIO") return "Cardio";
   if (code === "TRAVEL" || mode === "travel") return "Travel version";
-  return `${mode === "short" ? "★ " : ""}Session ${code}`;
+  return `Session ${code}${mode === "short" ? " · short" : ""}`;
 }
 
 /** First training week of a band phase (for "band starts in week 5"). */

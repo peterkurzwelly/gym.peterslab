@@ -80,7 +80,7 @@ export function SyncSection({ index }: { index: string }) {
     <Section id="sync" index={index} title="Sync" right={<SyncDot status={status.state} />}>
       <Card>
         <div className="flex flex-col gap-4">
-          <p className="text-[13px] leading-snug text-paper-dim">Logging works offline. The key stays on this phone and only goes to your own server.</p>
+          <p className="text-[13px] leading-snug text-fg-dim">Logging works offline. The key stays on this phone and only goes to your own server.</p>
 
           <Field
             label="Sync key"
@@ -139,7 +139,7 @@ export function SyncSection({ index }: { index: string }) {
             <Readout label="Last sync">{fmtAgo(status.lastSyncAt, now)}</Readout>
             <Readout label="On this phone">{pendingText(status.pending)}</Readout>
             {status.lastError && status.state !== "offline" && status.state !== "syncing" && (
-              <p className="mt-1 text-[12px] leading-snug text-paper-faint">{status.lastError}</p>
+              <p className="mt-1 text-[12px] leading-snug text-fg-faint">{status.lastError}</p>
             )}
           </div>
 

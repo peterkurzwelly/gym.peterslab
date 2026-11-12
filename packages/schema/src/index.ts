@@ -3,7 +3,7 @@
  *
  * Conventions
  * - IDs are client generated ULIDs, except singletons with deterministic IDs:
- *   settings ("settings"), checkin ("ck_YYYY-MM-DD"), training_week ("wk_YYYY-MM-DD", the Monday).
+ *   settings ("settings"), checkin ("ck_YYYY-MM-DD"), body_log ("bd_YYYY-MM-DD"), training_week ("wk_YYYY-MM-DD", the Monday).
  *   Decisions use deterministic IDs built by the engine (see engine docs).
  * - Every synced row has updated_at (ISO 8601 UTC with ms) and deleted_at (ISO or null, soft delete).
  * - Local dates are "YYYY-MM-DD" in the user's timezone (settings.timezone).
@@ -323,12 +323,89 @@ export const EngineConfig = z.object({
   session: z.object({ auto_finish_hours: z.number() }),
   rest: z.object({ main_lift_s: z.number().int(), starred_s: z.number().int(), other_s: z.number().int() }),
   who: z.object({ weekly_minutes: z.number(), hard_multiplier: z.number() }),
+  /**
+   * Body and fuel (ENGINE_RULES section 10). Every key named *_pct here is PERCENT OF BODY WEIGHT PER WEEK,
+   * the same unit as settings.cut_rate_pct (0.5 means 0.5%), not a fraction like the *_pct keys above.
+   */
+  body: z.object({
+    /** Mifflin St Jeor: BMR = per_kg × kg + per_cm × cm − per_year × age + male_offset | female_offset. */
+    mifflin: z.object({
+      per_kg: z.number(),
+      per_cm: z.number(),
+      per_year: z.number(),
+      male_offset: z.number(),
+      female_offset: z.number(),
+    }),
+    /** Maintenance = BMR × factor. The factor covers the job plus the program's training. */
+    activity_factor: z.object({ desk: z.number().positive(), feet: z.number().positive(), physical: z.number().positive() }),
+    kcal_per_kg_fat: z.number().positive(),
+    /** Weekly loss on a cut. default_pct seeds settings.cut_rate_pct; above max_pct counts as too fast. */
+    cut_rate: z.object({ default_pct: z.number().positive(), min_pct: z.number().positive(), max_pct: z.number().positive() }),
+    /** Weekly gain on goal "gain". Above max_pct counts as too fast. */
+    gain_rate: z.object({ target_pct: z.number().positive(), max_pct: z.number().positive() }),
+    recomp_offset_kcal: z.number(),
+    gain_offset_kcal: z.number(),
+    /** The calorie target never goes below this. */
+    kcal_floor: z.object({ male: z.number().positive(), female: z.number().positive() }),
+    kcal_round_to: z.number().positive(),
+    protein: z.object({
+      g_per_kg: z.number().positive(),
+      round_to_g: z.number().positive(),
+      /** Fraction of the target: protein counts as hit at ≥ (1 − hit_tolerance) × target. */
+      hit_tolerance: z.number().min(0).max(1),
+    }),
+    fat: z.object({ min_g_per_kg: z.number().positive(), round_to_g: z.number().positive() }),
+    /** Seeds settings.steps_target. */
+    steps_target_default: z.number().int().nonnegative(),
+    /** Trend = trailing mean of the weigh-ins in the last window_days days, when there are at least min_weigh_ins. */
+    trend: z.object({ window_days: z.number().int().positive(), min_weigh_ins: z.number().int().positive() }),
+    /** Rate = trend change over span_days, scaled to a week. Needs trend values at least min_span_days apart. */
+    rate: z.object({ span_days: z.number().int().positive(), min_span_days: z.number().int().positive() }),
+    pace: z.object({ tolerance_pct: z.number().nonnegative() }),
+    /** Weekly adaptive calorie adjustment, replayed from the logs. */
+    adjustment: z.object({
+      step_kcal: z.number().positive(),
+      tolerance_pct: z.number().nonnegative(),
+      max_total_kcal: z.number().nonnegative(),
+      /** A week needs this many weigh-ins, and so does the week before it. */
+      min_weigh_ins: z.number().int().positive(),
+      /** A week needs protein logged on this many days. */
+      min_protein_days: z.number().int().nonnegative(),
+      /** The weigh-ins of the two weeks must lie at least this many days apart on average, else the week is not judged. */
+      min_gap_days: z.number().positive(),
+    }),
+    /** weeks_to_goal beyond this is reported as null. */
+    goal: z.object({ max_weeks: z.number().int().positive() }),
+    series_max_days: z.number().int().positive(),
+    evidence: Evidence,
+  }),
 });
 export type EngineConfig = z.infer<typeof EngineConfig>;
 
 // ---------- synced tables ----------
 export const WeekKiller = z.enum(["work_peaks", "travel", "evenings", "low_energy"]);
 export type WeekKiller = z.infer<typeof WeekKiller>;
+
+export const Sex = z.enum(["male", "female"]);
+export type Sex = z.infer<typeof Sex>;
+export const JobActivity = z.enum(["desk", "feet", "physical"]);
+export type JobActivity = z.infer<typeof JobActivity>;
+export const BodyGoal = z.enum(["cut", "recomp", "gain"]);
+export type BodyGoal = z.infer<typeof BodyGoal>;
+
+/** Allowed ranges (inclusive) for body log and body settings values. The schemas below and input clamping read these. */
+export const BODY_LIMITS = {
+  weight_kg: { min: 30, max: 300 },
+  waist_cm: { min: 40, max: 200 },
+  steps: { min: 0, max: 100_000 },
+  protein_g: { min: 0, max: 500 },
+  kcal: { min: 0, max: 10_000 },
+  sleep_h: { min: 0, max: 24 },
+  note: { max: 500 },
+  birth_year: { min: 1900, max: 2100 },
+  height_cm: { min: 100, max: 250 },
+  cut_rate_pct: { min: 0.25, max: 1.0 },
+} as const;
 
 export const RememberedWeight = z.object({ weight: z.number().nonnegative(), reps: z.number().int().positive() });
 export type RememberedWeight = z.infer<typeof RememberedWeight>;
@@ -354,6 +431,29 @@ export const Settings = z.object({
   evening_hour: z.number().int().min(0).max(23).nullable().default(19),
   /** What usually kills Peter's weeks (SPEC 11.5); decides which fallback the app pushes hardest. */
   week_killers: z.array(WeekKiller).default(["work_peaks", "travel", "evenings"]),
+  // ---- body and fuel (ENGINE_RULES section 10). All defaulted, so rows stored before they existed still parse. ----
+  sex: Sex.nullable().default(null),
+  birth_year: z.number().int().min(BODY_LIMITS.birth_year.min).max(BODY_LIMITS.birth_year.max).nullable().default(null),
+  height_cm: z.number().min(BODY_LIMITS.height_cm.min).max(BODY_LIMITS.height_cm.max).nullable().default(null),
+  /** What the working day looks like; picks the activity factor for the maintenance estimate. */
+  job_activity: JobActivity.default("desk"),
+  goal: BodyGoal.default("cut"),
+  /** Weekly loss on a cut as PERCENT of body weight (0.5 = 0.5%). Default mirrors config body.cut_rate.default_pct. */
+  cut_rate_pct: z.number().min(BODY_LIMITS.cut_rate_pct.min).max(BODY_LIMITS.cut_rate_pct.max).default(0.5),
+  goal_weight_kg: z.number().min(BODY_LIMITS.weight_kg.min).max(BODY_LIMITS.weight_kg.max).nullable().default(null),
+  /** Set by hand: wins over the engine's calorie target. */
+  kcal_override: z.number().min(BODY_LIMITS.kcal.min).max(BODY_LIMITS.kcal.max).nullable().default(null),
+  /** Set by hand: wins over the engine's protein target. */
+  protein_override_g: z.number().min(BODY_LIMITS.protein_g.min).max(BODY_LIMITS.protein_g.max).nullable().default(null),
+  /** Daily steps target. Default mirrors config body.steps_target_default. */
+  steps_target: z.number().int().min(BODY_LIMITS.steps.min).max(BODY_LIMITS.steps.max).default(8000),
+  /**
+   * Set when the goal or the pace changes: weeks that started before this local date are no longer judged
+   * (they were judged against the old goal). null = every week since the first log counts.
+   */
+  body_adjust_since: LocalDate.nullable().default(null),
+  /** The calorie correction already earned when body_adjust_since was set (signed kcal). Carried over as it was. */
+  body_adjust_base_kcal: z.number().int().min(-BODY_LIMITS.kcal.max).max(BODY_LIMITS.kcal.max).default(0),
   ...syncFields,
 });
 export type Settings = z.infer<typeof Settings>;
@@ -431,6 +531,24 @@ export const Checkin = z.object({
 });
 export type Checkin = z.infer<typeof Checkin>;
 
+/**
+ * Body and fuel for one local date: one row per date, every value optional (null = not logged).
+ * weight_kg is the morning weigh-in. steps, protein_g and kcal are the day's running totals.
+ */
+export const BodyLog = z.object({
+  id: Id, // "bd_YYYY-MM-DD"
+  date: LocalDate,
+  weight_kg: z.number().min(BODY_LIMITS.weight_kg.min).max(BODY_LIMITS.weight_kg.max).nullable(),
+  waist_cm: z.number().min(BODY_LIMITS.waist_cm.min).max(BODY_LIMITS.waist_cm.max).nullable(),
+  steps: z.number().int().min(BODY_LIMITS.steps.min).max(BODY_LIMITS.steps.max).nullable(),
+  protein_g: z.number().min(BODY_LIMITS.protein_g.min).max(BODY_LIMITS.protein_g.max).nullable(),
+  kcal: z.number().min(BODY_LIMITS.kcal.min).max(BODY_LIMITS.kcal.max).nullable(),
+  sleep_h: z.number().min(BODY_LIMITS.sleep_h.min).max(BODY_LIMITS.sleep_h.max).nullable(),
+  note: z.string().max(BODY_LIMITS.note.max).nullable(),
+  ...syncFields,
+});
+export type BodyLog = z.infer<typeof BodyLog>;
+
 export const Decision = z.object({
   id: Id,
   date: IsoDateTime,
@@ -447,7 +565,7 @@ export type Decision = z.infer<typeof Decision>;
 
 // ---------- sync protocol ----------
 export const SYNC_TABLES = [
-  "settings", "exercise", "training_week", "session", "set_log", "cardio_log", "checkin", "decision",
+  "settings", "exercise", "training_week", "session", "set_log", "cardio_log", "checkin", "decision", "body_log",
 ] as const;
 export type SyncTable = (typeof SYNC_TABLES)[number];
 
@@ -460,6 +578,7 @@ export const TableSchemas = {
   cardio_log: CardioLog,
   checkin: Checkin,
   decision: Decision,
+  body_log: BodyLog,
 } as const satisfies Record<SyncTable, z.ZodTypeAny>;
 
 export type RowOf<T extends SyncTable> = z.infer<(typeof TableSchemas)[T]>;
@@ -505,7 +624,7 @@ export const SyncResponse = z.object({
 });
 export type SyncResponse = z.infer<typeof SyncResponse>;
 
-/** GET /api/export and POST /api/import body. */
+/** GET /api/export and POST /api/import body. Every table is optional, so files written before a table existed still import. */
 export const ExportFile = z.object({
   format: z.literal("workout-os-export"),
   version: z.literal(1),

@@ -34,11 +34,11 @@ export function EngineError({ title = "Today could not be planned", detail }: { 
   return (
     <Page className="gap-3">
       <Card label="Today">
-        <h1 className="m-0 font-display text-[34px] font-normal leading-[1.05] text-paper">{title}</h1>
-        <p className="mt-3 text-[15px] leading-snug text-paper">
+        <h1 className="m-0 font-display text-[34px] font-normal leading-[1.05] text-fg">{title}</h1>
+        <p className="mt-3 text-[15px] leading-snug text-fg">
           Your log is safe on this phone
           {count ? (
-            <span className="text-paper-dim">
+            <span className="text-fg-dim">
               {" "}
               · {count.sets} {count.sets === 1 ? "set" : "sets"}
               {count.cardio > 0 ? ` and ${count.cardio} cardio ${count.cardio === 1 ? "log" : "logs"}` : ""} saved
@@ -46,8 +46,8 @@ export function EngineError({ title = "Today could not be planned", detail }: { 
           ) : null}
           .
         </p>
-        <p className="mt-2 text-[13px] leading-snug text-paper-dim">Nothing was lost. Reload to try again, or keep a backup first.</p>
-        {detail && <p className="mt-2 break-words text-[11px] leading-snug text-paper-faint">{detail}</p>}
+        <p className="mt-2 text-[13px] leading-snug text-fg-dim">Nothing was lost. Reload to try again, or keep a backup first.</p>
+        {detail && <p className="mt-2 break-words text-[11px] leading-snug text-fg-faint">{detail}</p>}
         <div className="mt-4 flex flex-col gap-2">
           <Button variant="primary" size="lg" block onClick={() => window.location.reload()}>
             Reload

@@ -25,11 +25,11 @@ export function AboutSection({ index, programName }: { index: string; programNam
             href={DOCS_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="gym-press inline-flex min-h-11 items-center gap-2 self-start rounded-[3px] text-[13px] text-orange underline decoration-orange/40 underline-offset-4 active:bg-ink-3"
+            className="gym-press inline-flex min-h-11 items-center gap-2 self-start rounded-2xl text-[13px] text-volt underline decoration-volt/40 underline-offset-4 active:bg-raise"
           >
             Docs and source on GitHub
           </a>
-          <p className="text-[12px] leading-snug text-paper-faint">Every target comes from the engine and carries its reason. The rules are in docs/ENGINE_RULES.md.</p>
+          <p className="text-[12px] leading-snug text-fg-faint">Every target comes from the engine and carries its reason. The rules are in docs/ENGINE_RULES.md.</p>
         </div>
       </Card>
     </Section>

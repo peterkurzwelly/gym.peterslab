@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { exerciseSummary, lastTimeText } from "../../src/components/ExerciseCard";
+import { lastTimeText } from "../../src/components/ExerciseCard";
+import { describeCardio } from "../../src/components/NextSessionCard";
 import { changeDelta, changeDeltaFor, changeNextLine, isStartingLoad, loadText } from "../../src/components/SummaryView";
 import { weekDoneText } from "../../src/components/WeekCard";
-import { backSquat, benchTopSet, farmersCarry, goals, plank, pullUp, splitSquat, summaryA, weekTarget } from "../../src/components/__fixtures__";
+import { backSquat, benchCalibration, bicepsCurl, cardioEasy, cardioIntervals, farmersCarry, goals, plank, pullUp, splitSquat, summaryA, weekTarget } from "../../src/components/__fixtures__";
+import { prescriptionLine, workoutTitle } from "../../src/screens/Workout";
 import { fmtAmount, fmtApproxMin, fmtClock, fmtKg, fmtKgDelta, fmtLoad, fmtLocalDate, fmtMinutes, fmtRange, fmtRangeAmount, fmtRelativeDate } from "../../src/lib/format";
 
 describe("format", () => {
@@ -45,18 +47,35 @@ describe("format", () => {
 });
 
 describe("component text helpers", () => {
-  it("exercise summary", () => {
-    expect(exerciseSummary(backSquat)).toBe("2 × 5–8 @ RIR 3");
-    expect(exerciseSummary(plank)).toBe("2 × 30–45 s @ RIR 3");
-    expect(exerciseSummary(splitSquat)).toBe("2 × 8–10/leg @ RIR 3");
-    expect(exerciseSummary(benchTopSet)).toBe("3 × 5–8 @ RIR 2 + top set");
-  });
-
-  it("last time line", () => {
+  it("last time line says 'N left', never '@ N'", () => {
     expect(lastTimeText(pullUp.last_time!, pullUp)).toBe("BW+5 × 8, 8, 7");
     expect(lastTimeText(plank.last_time!, plank)).toBe("30 s, 30 s");
-    expect(lastTimeText(splitSquat.last_time!, splitSquat)).toBe("12/hand × 10/leg, 10/leg @ 3");
+    expect(lastTimeText(splitSquat.last_time!, splitSquat)).toBe("12/hand × 10/leg, 10/leg, 3 left");
     expect(lastTimeText({ session_id: "x", date: "2026-11-09", sets: [{ weight: 24, reps: 40, rir: null }] }, farmersCarry)).toBe("24/hand × 40 m");
+    expect(lastTimeText({ session_id: "x", date: "2026-11-09", sets: [{ weight: 60, reps: 8, rir: 3 }, { weight: 62.5, reps: 7, rir: 2 }] }, backSquat)).toBe("60 × 8 · 62.5 × 7");
+  });
+
+  it("prescription line on the workout overview and in Program", () => {
+    expect(prescriptionLine(backSquat)).toBe("2 × 5–8 · 60 kg");
+    expect(prescriptionLine(benchCalibration)).toBe("2 × 5–8 · pick a weight");
+    expect(prescriptionLine(plank)).toBe("2 × 30–45 s");
+    expect(prescriptionLine(pullUp)).toBe("3 × 6–12 · BW+5");
+    expect(prescriptionLine(bicepsCurl)).toBe("2 × 10–12 · 12 kg each");
+    expect(prescriptionLine(farmersCarry)).toBe("3 × 30–40 m · 24 kg each");
+  });
+
+  it("workout titles", () => {
+    expect(workoutTitle("A", "full", "Squat + bench")).toBe("Squat + bench");
+    expect(workoutTitle("A", "short", "Squat + bench")).toBe("Squat + bench · short");
+    expect(workoutTitle("B", "full")).toBe("Session B");
+    expect(workoutTitle("B", "full", "Session B")).toBe("Session B");
+    expect(workoutTitle("TRAVEL", "travel", "Travel version")).toBe("Travel workout");
+    expect(workoutTitle("A", "travel", "Squat + bench")).toBe("Travel workout");
+  });
+
+  it("cardio in one line", () => {
+    expect(describeCardio(cardioIntervals)).toBe("4 × 2 min hard / 2 min easy");
+    expect(describeCardio(cardioEasy)).toBe("30 min easy");
   });
 
   it("week done counts up to each target", () => {

@@ -89,16 +89,16 @@ export function RememberedWeights({ entries, mainIds, exercises, programIds, inc
                 aria-expanded={isOpen}
                 aria-label={`${name}: ${rem ? `${fmtKg(rem.weight)} kg${perHand} × ${rem.reps}` : "not set"}. Edit`}
                 onClick={() => edit(id)}
-                className="gym-press flex min-h-11 w-full items-center gap-3 rounded-[3px] text-left active:bg-ink-3"
+                className="gym-press flex min-h-11 w-full items-center gap-3 rounded-2xl text-left active:bg-raise"
               >
-                <span className="min-w-0 flex-1 truncate text-[14px] text-paper">{name}</span>
+                <span className="min-w-0 flex-1 truncate text-[14px] text-fg">{name}</span>
                 {rem ? (
-                  <span className="shrink-0 font-mono text-[15px] tabular-nums text-paper">
+                  <span className="shrink-0 text-[15px] tabular-nums text-fg">
                     {fmtKg(rem.weight)}
-                    <span className="text-[11px] text-paper-dim"> kg{perHand}</span> × {rem.reps}
+                    <span className="text-[11px] text-fg-dim"> kg{perHand}</span> × {rem.reps}
                   </span>
                 ) : (
-                  <span className="shrink-0 text-[12px] uppercase tracking-[0.1em] text-paper-faint">Not set</span>
+                  <span className="shrink-0 text-[12px] uppercase tracking-[0.06em] text-fg-faint">Not set</span>
                 )}
               </button>
               {isOpen && (
